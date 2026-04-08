@@ -1,5 +1,9 @@
 # Lambda Powertools Reference
 
+[![CI](https://github.com/timpugh/lambda-powertools-reference/actions/workflows/ci.yml/badge.svg)](https://github.com/timpugh/lambda-powertools-reference/actions/workflows/ci.yml)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
+[![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://timpugh.github.io/lambda-powertools-reference/)
+
 **Docs:** https://timpugh.github.io/lambda-powertools-reference/
 
 This project contains source code and supporting files for a serverless application that you can deploy with the AWS CDK. It includes the following files and folders.
