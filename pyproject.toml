@@ -1,0 +1,85 @@
+[project]
+name = "hello-world"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+# --- Ruff ---
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+exclude = [".venv", "cdk.out", "docs", "__pycache__"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "S",    # flake8-bandit
+    "UP",   # pyupgrade
+    "SIM",  # flake8-simplify
+    "RUF",  # ruff-specific rules
+]
+ignore = [
+    "S101",  # allow assert in tests
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101", "S106"]
+
+# --- Mypy ---
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+
+# --- Pylint ---
+[tool.pylint."messages control"]
+disable = [
+    "C0114",  # missing-module-docstring
+    "C0115",  # missing-class-docstring
+    "C0116",  # missing-function-docstring
+    "C0301",  # line-too-long (ruff handles this)
+    "C0303",  # trailing-whitespace
+    "C0304",  # missing-final-newline
+    "C0305",  # trailing-newlines
+    "C0411",  # wrong-import-order (ruff isort)
+    "E0401",  # import-error (mypy handles this)
+    "E1120",  # no-value-for-parameter (false positive on decorators)
+    "R0903",  # too-few-public-methods
+    "W0611",  # unused-import (ruff F401)
+    "W0612",  # unused-variable (ruff F841)
+    "W0613",  # unused-argument
+]
+
+[tool.pylint.format]
+max-line-length = 120
+
+[tool.pylint.design]
+max-args = 8
+max-locals = 20
+max-returns = 6
+max-branches = 12
+max-statements = 50
+max-attributes = 10
+
+# --- Pytest ---
+[tool.pytest.ini_options]
+timeout = 30
+addopts = "--cov=lambda --cov-report=term-missing -n auto --html=report.html --self-contained-html"
+env = [
+    "AWS_SAM_STACK_NAME=HelloWorld",
+    "POWERTOOLS_IDEMPOTENCY_DISABLED=true",
+    "POWERTOOLS_SERVICE_NAME=hello-world",
+    "POWERTOOLS_METRICS_NAMESPACE=HelloWorld",
+    "POWERTOOLS_LOG_LEVEL=INFO",
+    "LOG_LEVEL=INFO",
+    "IDEMPOTENCY_TABLE_NAME=test-idempotency",
+    "GREETING_PARAM_NAME=/test/greeting",
+    "APPCONFIG_APP_NAME=test-app",
+    "APPCONFIG_ENV_NAME=test-env",
+    "APPCONFIG_PROFILE_NAME=test-profile",
+]

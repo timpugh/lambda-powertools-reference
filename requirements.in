@@ -1,0 +1,29 @@
+# Constrain shared packages to match test and lambda versions
+-c tests/requirements.txt
+
+# CDK / IaC tooling
+aws-cdk-lib==2.248.0
+constructs==10.6.0
+aws-cdk-aws-lambda-python-alpha==2.248.0a0
+cdk-monitoring-constructs==9.22.2
+cdk-nag==2.37.55
+
+# Static analysis & linting
+radon==6.0.1
+xenon==0.9.3
+mypy==1.20.0
+ruff==0.15.9
+pylint==4.0.5
+bandit==1.9.4
+pip-audit==2.10.0
+pre-commit==4.5.1
+
+# Type stubs
+boto3-stubs==1.42.83
+
+# Documentation
+sphinx==8.2.3
+myst-parser==4.0.1
+
+# Dependency management
+pip-tools==7.5.3
