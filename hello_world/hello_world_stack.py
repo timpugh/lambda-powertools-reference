@@ -47,6 +47,19 @@ class HelloWorldStack(Stack):
     """
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs: Any) -> None:
+        """Provision all AWS resources for the Hello World application.
+
+        Creates a DynamoDB table for idempotency, an SSM parameter for the
+        greeting message, an AppConfig application for feature flags, a Lambda
+        function with Powertools environment variables, an API Gateway REST API
+        exposing GET /hello, Application Insights monitoring, and a CloudWatch
+        dashboard via cdk-monitoring-constructs.
+
+        Args:
+            scope: The CDK construct scope.
+            construct_id: The unique identifier for this stack.
+            **kwargs: Additional keyword arguments passed to the parent Stack.
+        """
         super().__init__(scope, construct_id, **kwargs)
 
         # cdk-nag: apply AWS Solutions checks

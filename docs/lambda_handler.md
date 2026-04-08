@@ -5,6 +5,5 @@
 ```{eval-rst}
 .. automodule:: app
    :members:
-   :undoc-members:
    :show-inheritance:
 ```
