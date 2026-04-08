@@ -1,2 +1,4 @@
-[bandit]
-exclude = tests,cdk.out,.venv
+exclude_dirs:
+  - tests
+  - cdk.out
+  - .venv

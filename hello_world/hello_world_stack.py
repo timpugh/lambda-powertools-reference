@@ -1,3 +1,5 @@
+from typing import Any, cast
+
 from aws_cdk import (
     Aspects,
     CfnOutput,
@@ -44,7 +46,7 @@ class HelloWorldStack(Stack):
     security checks (cdk-nag).
     """
 
-    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
+    def __init__(self, scope: Construct, construct_id: str, **kwargs: Any) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         # cdk-nag: apply AWS Solutions checks
@@ -55,9 +57,7 @@ class HelloWorldStack(Stack):
             self,
             "IdempotencyTable",
             table_name=f"{self.stack_name}-idempotency",
-            partition_key=dynamodb.Attribute(
-                name="id", type=dynamodb.AttributeType.STRING
-            ),
+            partition_key=dynamodb.Attribute(name="id", type=dynamodb.AttributeType.STRING),
             time_to_live_attribute="expiration",
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
             removal_policy=RemovalPolicy.DESTROY,
@@ -207,7 +207,7 @@ class HelloWorldStack(Stack):
             self,
             "HelloWorldFunctionIamRoleOutput",
             description="IAM Role created for Hello World function",
-            value=hello_fn.role.role_arn,
+            value=cast(iam.IRole, hello_fn.role).role_arn,
         )
 
         # cdk-nag suppressions for hello-world sample app

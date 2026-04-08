@@ -1,5 +1,7 @@
 # Lambda Powertools Reference
 
+**Docs:** https://timpugh.github.io/lambda-powertools-reference/
+
 This project contains source code and supporting files for a serverless application that you can deploy with the AWS CDK. It includes the following files and folders.
 
 - lambda - Code for the application's Lambda function.
@@ -95,8 +97,11 @@ source .venv/bin/activate
 # Install pip-tools first (needed for pip-sync)
 pip install pip-tools
 
-# Install dev/CDK dependencies and test dependencies
-pip-sync requirements.txt tests/requirements.txt
+# For CDK, linting, and type checking
+pip-sync requirements.txt
+
+# For running tests
+pip-sync tests/requirements.txt lambda/requirements.txt
 
 # Make sure Finch is running
 finch vm start
@@ -292,6 +297,22 @@ Pre-commit is configured in `.pre-commit-config.yaml` to run ruff, mypy, pylint,
 ```bash
 pre-commit install
 ```
+
+## GitHub Actions
+
+Three workflows run automatically on push to `main`:
+
+| Workflow | Trigger | What it does |
+|---|---|---|
+| **CI** | Push / PR to `main` | Runs pre-commit hooks (quality job) and pytest unit tests (test job) |
+| **Docs** | Push to `main` | Builds Sphinx docs and deploys to GitHub Pages |
+| **Dependency Audit** | Every Monday 9am UTC | Runs `pip-audit` across all requirements files |
+
+Both the `quality` and `test` CI jobs must pass before anything can merge to `main` (branch protection).
+
+The CI installs dependencies with `pip-sync` to match the local dev workflow exactly:
+- `quality` job: `pip-sync requirements.txt`
+- `test` job: `pip-sync tests/requirements.txt lambda/requirements.txt`
 
 ## CDK security checks
 

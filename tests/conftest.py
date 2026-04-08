@@ -51,9 +51,7 @@ def lambda_context(mocker):
     context = mocker.MagicMock()
     context.function_name = "HelloWorldFunction"
     context.memory_limit_in_mb = 128
-    context.invoked_function_arn = (
-        "arn:aws:lambda:us-east-1:123456789012:function:HelloWorldFunction"
-    )
+    context.invoked_function_arn = "arn:aws:lambda:us-east-1:123456789012:function:HelloWorldFunction"
     context.aws_request_id = "test-request-id"
     return context
 

@@ -87,9 +87,7 @@ def hello() -> dict:
     logger.info("Greeting fetched from parameter store", greeting=greeting)
 
     # Check feature flag for enhanced greeting
-    enhanced = feature_flags.evaluate(
-        name="enhanced_greeting", default=False
-    )
+    enhanced = feature_flags.evaluate(name="enhanced_greeting", default=False)
 
     if enhanced:
         message = f"{greeting} - enhanced mode enabled"
@@ -119,4 +117,4 @@ def lambda_handler(event: dict, context: LambdaContext) -> dict:
     Returns:
         dict: API Gateway Lambda proxy response.
     """
-    return app.resolve(event, context)
+    return app.resolve(event, context)  # type: ignore[no-any-return]
