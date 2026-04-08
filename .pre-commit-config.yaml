@@ -10,7 +10,7 @@ repos:
     rev: v1.14.0
     hooks:
       - id: mypy
-        additional_dependencies: [boto3-stubs, aws-cdk-lib]
+        additional_dependencies: [boto3-stubs==1.42.83, aws-cdk-lib==2.248.0]
         args: [--ignore-missing-imports]
         exclude: ^(app\.py|tests/)
 

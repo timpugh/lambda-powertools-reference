@@ -26,8 +26,11 @@ jobs:
           python-version: "3.12"
           cache: pip
 
+      - name: Install pip-tools
+        run: pip install pip-tools
+
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip-sync requirements.txt
 
       - name: Build docs
         run: PYTHONPATH=lambda:. sphinx-build -b html docs docs/_build

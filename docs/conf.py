@@ -27,7 +27,7 @@ autodoc_member_order = "bysource"
 autodoc_typehints = "description"
 
 # Mock heavy Lambda deps so Sphinx can import lambda/app.py without installing them
-autodoc_mock_imports = ["aws_lambda_powertools", "aws_xray_sdk"]
+autodoc_mock_imports = ["aws_lambda_powertools", "aws_xray_sdk", "boto3", "botocore"]
 
 # Output
 html_theme = "alabaster"
