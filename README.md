@@ -104,11 +104,11 @@ source .venv/bin/activate
 # Install pip-tools first (needed for pip-sync)
 pip install pip-tools
 
-# For CDK, linting, and type checking
+# Install dev dependencies (CDK, linting, type checking) via pip-sync
 pip-sync requirements.txt
 
-# For running tests
-pip-sync tests/requirements.txt lambda/requirements.txt
+# Add test and Lambda dependencies on top (additive — does not remove dev deps)
+pip install -r tests/requirements.txt -r lambda/requirements.txt
 
 # Make sure Finch is running
 finch vm start
@@ -479,11 +479,14 @@ To upgrade all dependencies:
 pip-compile --upgrade --generate-hashes --allow-unsafe requirements.in -o requirements.txt
 ```
 
-To install and keep your venv in sync (removes stale packages that aren't in the lock files):
+To install and keep your venv in sync with dev dependencies:
 
 ```bash
-pip-sync requirements.txt tests/requirements.txt
+pip-sync requirements.txt
+pip install -r tests/requirements.txt -r lambda/requirements.txt
 ```
+
+`pip-sync` is used for the dev context because it removes stale packages not in the lock file. Test deps are added with `pip install -r` instead — using `pip-sync` for both contexts would remove dev packages, corrupting the venv. CI uses separate jobs so each runs `pip-sync` against a single context cleanly.
 
 ### `lambda/requirements.txt` — Lambda runtime
 
