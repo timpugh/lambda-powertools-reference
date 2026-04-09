@@ -34,6 +34,9 @@ from aws_cdk import (
 from aws_cdk import (
     aws_ssm as ssm,
 )
+from aws_cdk import (
+    custom_resources as cr,
+)
 from aws_cdk.aws_lambda_python_alpha import PythonFunction
 from cdk_monitoring_constructs import DefaultDashboardFactory, MonitoringFacade
 from cdk_nag import AwsSolutionsChecks, NagSuppressions
@@ -249,6 +252,28 @@ class HelloWorldStack(Stack):
         )
         app_insights.add_dependency(resource_group)
 
+        # Custom resource to delete the Application Insights auto-created CloudWatch
+        # dashboard on stack destroy. Application Insights creates a dashboard named
+        # after the resource group outside of CloudFormation, so CDK cannot own it
+        # directly. This Lambda-backed custom resource calls DeleteDashboards at
+        # destroy time so no dashboard is left behind after cdk destroy.
+        app_insights_dashboard_cleanup = cr.AwsCustomResource(
+            self,
+            "AppInsightsDashboardCleanup",
+            on_delete=cr.AwsSdkCall(
+                service="CloudWatch",
+                action="deleteDashboards",
+                parameters={"DashboardNames": [resource_group.name]},
+                physical_resource_id=cr.PhysicalResourceId.of(resource_group.name),
+            ),
+            policy=cr.AwsCustomResourcePolicy.from_sdk_calls(
+                resources=cr.AwsCustomResourcePolicy.ANY_RESOURCE,
+            ),
+            log_retention=logs.RetentionDays.ONE_WEEK,
+        )
+        # Must run after Application Insights has had a chance to create the dashboard
+        app_insights_dashboard_cleanup.node.add_dependency(app_insights)
+
         # Monitoring dashboard via cdk-monitoring-constructs
         # CloudWatch dashboards are global — scope the name to the stack so
         # multiple regional deployments don't collide on the same dashboard name.
@@ -327,7 +352,7 @@ class HelloWorldStack(Stack):
                 {"id": "AwsSolutions-IAM4", "reason": "Managed policies acceptable for sample app"},
                 {
                     "id": "AwsSolutions-IAM5",
-                    "reason": "Wildcard permissions for X-Ray and AppConfig",
+                    "reason": "Wildcard permissions for X-Ray, AppConfig, and CloudWatch dashboard cleanup custom resource",
                 },
                 {"id": "AwsSolutions-L1", "reason": "Runtime version is intentionally pinned"},
             ],
