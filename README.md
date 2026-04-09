@@ -541,27 +541,53 @@ Rules that were previously suppressed and have since been implemented are remove
 
 ## Frontend stack
 
-The frontend is a separate CDK stack (`HelloWorldFrontendStack`) that is intentionally decoupled from the backend. This allows the frontend to be deployed and destroyed independently of the API, and follows the standard pattern for CDK multi-stack applications.
+The frontend is split across two CDK stacks — `HelloWorldWafStack` and `HelloWorldFrontendStack` — intentionally decoupled from the backend. This allows the frontend to be deployed and destroyed independently of the API, and demonstrates the standard CDK multi-stack and cross-region reference pattern.
 
 ### Architecture
 
 ```
 Browser → CloudFront → S3 (private bucket)
                ↓
-             WAF WebACL (inspect every request)
+        WAF WebACL (us-east-1, always)
 ```
 
 The browser calls `GET /hello` directly from JavaScript against the API Gateway URL — CloudFront only serves static assets, it does not proxy API requests.
 
-### Stacks and deployment
+### Three-stack design and cross-region support
 
-| Stack | Contents | Command |
-|-------|----------|---------|
-| `HelloWorld` | Lambda, API Gateway, DynamoDB, SSM, AppConfig | `cdk deploy HelloWorld` |
-| `HelloWorldFrontend` | S3, CloudFront, WAF | `cdk deploy HelloWorldFrontend` |
-| Both | — | `cdk deploy --all` |
+This project uses three stacks, not two. WAF lives in its own stack because CloudFront-scoped WAF WebACLs are an AWS hard requirement to exist in `us-east-1` — even if every other resource is in a different region. By isolating WAF into `HelloWorldWafStack`, the backend and frontend can be deployed to any region without duplicating the WAF or violating the constraint.
 
-The backend exposes `api_url` as a stack property. The frontend stack consumes it and injects it into `config.json` at deploy time via `BucketDeployment`. The browser fetches `/config.json` at runtime so the API URL is never hardcoded in source.
+| Stack | Region | Contents |
+|-------|--------|----------|
+| `HelloWorldWaf` | Always `us-east-1` | WAF WebACL with all rules |
+| `HelloWorld` | Configurable | Lambda, API Gateway, DynamoDB, SSM, AppConfig |
+| `HelloWorldFrontend` | Configurable | S3, CloudFront (references WAF ARN) |
+
+**Deploying to us-east-1 (default):**
+
+```bash
+cdk deploy --all
+```
+
+**Deploying to a different region:**
+
+```bash
+cdk deploy --all -c region=eu-west-1
+```
+
+WAF stays in `us-east-1`. The backend and frontend deploy to `eu-west-1`. CDK wires the WAF ARN across regions automatically — no manual steps.
+
+### How cross-region references work
+
+When the frontend stack is in a different region from the WAF stack, CDK cannot pass the WAF ARN as a direct CloudFormation output (outputs only work within a single region). Instead, CDK uses `cross_region_references=True` on the frontend stack to bridge the value automatically:
+
+1. During `cdk deploy`, CDK writes the WAF ARN into an SSM Parameter in `us-east-1`
+2. A CDK-managed custom resource in the frontend stack's region reads that SSM parameter at deploy time
+3. The WAF ARN is resolved and attached to the CloudFront distribution
+
+This is entirely transparent — you pass `waf.web_acl_arn` in `app.py` just like any other stack property. The SSM parameters are CloudFormation-managed and are cleaned up on `cdk destroy`.
+
+The backend exposes `api_url` as a stack property. The frontend stack injects it into `config.json` at deploy time via `BucketDeployment`. The browser fetches `/config.json` at runtime so the API URL is never hardcoded in source.
 
 ### S3 bucket
 
@@ -592,11 +618,11 @@ The WebACL sits in front of CloudFront and inspects every request before it reac
 
 All rules emit CloudWatch metrics and sampled requests, so WAF activity is visible in the console without additional configuration.
 
-> **WAF requires `us-east-1`** — CloudFront WAF WebACLs must be deployed in `us-east-1` regardless of where your other resources live. This is an AWS service constraint.
+The WAF WebACL lives in `HelloWorldWafStack` which is always pinned to `us-east-1`. This is an AWS hard constraint for CloudFront-scoped WebACLs. The cross-region reference pattern described above handles wiring the ARN to CloudFront automatically regardless of where the frontend stack is deployed.
 
 ### Resource cleanup
 
-Every resource in `HelloWorldFrontendStack` has `RemovalPolicy.DESTROY`, including all CloudWatch log groups. `cdk destroy HelloWorldFrontend` leaves nothing behind.
+Every resource in `HelloWorldWafStack` and `HelloWorldFrontendStack` has `RemovalPolicy.DESTROY`, including all CloudWatch log groups. `cdk destroy --all` leaves nothing behind in any region.
 
 Note: CDK creates an internal singleton Lambda to empty the S3 bucket before deletion (`Custom::S3AutoDeleteObjects`). Its log group is explicitly declared in the stack so CloudFormation owns it and deletes it on destroy — following the same principle as the API Gateway execution log group in the backend stack.
 
