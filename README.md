@@ -8,13 +8,16 @@
 
 This project contains source code and supporting files for a serverless application that you can deploy with the AWS CDK. It includes the following files and folders.
 
-- lambda - Code for the application's Lambda function.
-- events - Invocation events that you can use to invoke the function.
-- tests - Unit tests for the application code.
-- tests/conftest.py - Shared test fixtures (API Gateway event, Lambda context, mocks).
-- docs - Sphinx documentation source files.
-- hello_world/hello_world_stack.py - The CDK stack that defines the application's AWS resources.
-- pyproject.toml - Consolidated tool configuration (ruff, mypy, pylint, pytest).
+- `app.py` - CDK entry point; instantiates the `HelloWorldStack` and calls `app.synth()`
+- `lambda/` - Code for the application's Lambda function
+- `hello_world/hello_world_stack.py` - The CDK stack that defines all AWS resources
+- `events/event.json` - A sample API Gateway proxy event for local SAM invocation
+- `tests/` - Unit and integration tests
+- `tests/conftest.py` - Shared test fixtures (API Gateway event, Lambda context, mocks)
+- `docs/` - Sphinx documentation source files
+- `pyproject.toml` - Consolidated tool configuration (ruff, mypy, pylint, pytest, coverage)
+- `.pre-commit-config.yaml` - Pre-commit hook definitions (runs on every `git commit`)
+- `.bandit` - Bandit security scanner configuration (excluded directories)
 
 The application uses several AWS resources, including Lambda functions, an API Gateway API, a DynamoDB table, SSM parameters, and AppConfig. These resources are defined in the `hello_world/hello_world_stack.py` file in this project. The Lambda function uses [AWS Lambda Powertools](https://docs.powertools.aws.dev/lambda/python/latest/) extensively — see the [Lambda Powertools features](#lambda-powertools-features) section below for details. Note that Powertools Tracer currently depends on the `aws-xray-sdk`, which is approaching deprecation. There is an [open RFC](https://github.com/aws-powertools/powertools-lambda/discussions/90) to replace it with OpenTelemetry as the tracing provider. You can update the stack to add AWS resources through the same deployment process that updates your application code.
 
@@ -147,6 +150,8 @@ You can invoke the Lambda function locally using the SAM CLI with the synthesize
 sam local invoke HelloWorldFunction -t cdk.out/HelloWorld.template.json --event events/event.json
 ```
 
+`events/event.json` is a sample API Gateway REST proxy event that simulates a `GET /hello` request. It includes realistic headers, a `requestContext` with a unique `requestId` (used by idempotency), and placeholder CloudFront fields. Use it as a starting point for local invocation — edit the `httpMethod`, `path`, or `body` fields to test different scenarios.
+
 You can also emulate the API locally:
 
 ```bash
@@ -206,28 +211,9 @@ python -m pytest tests/unit -v
 
 ### Integration tests
 
-Integration tests call the live API Gateway endpoint, so the stack must be deployed first. They verify the response body, content type headers, and response time (under 5 seconds). The stack name and other test environment variables are configured in `pyproject.toml` via pytest-env:
+Integration tests call the live API Gateway endpoint, so the stack must be deployed first. They verify the response body, content type headers, and response time (under 5 seconds). The stack name and other test environment variables are configured in `pyproject.toml` via pytest-env (see the `env` key under `[tool.pytest.ini_options]`).
 
-```toml
-[tool.pytest.ini_options]
-timeout = 30
-addopts = "--cov=lambda --cov-report=term-missing -n auto --html=report.html --self-contained-html"
-env = [
-    "AWS_SAM_STACK_NAME=HelloWorld",
-    "POWERTOOLS_IDEMPOTENCY_DISABLED=true",
-    "POWERTOOLS_SERVICE_NAME=hello-world",
-    "POWERTOOLS_METRICS_NAMESPACE=HelloWorld",
-    "POWERTOOLS_LOG_LEVEL=INFO",
-    "LOG_LEVEL=INFO",
-    "IDEMPOTENCY_TABLE_NAME=test-idempotency",
-    "GREETING_PARAM_NAME=/test/greeting",
-    "APPCONFIG_APP_NAME=test-app",
-    "APPCONFIG_ENV_NAME=test-env",
-    "APPCONFIG_PROFILE_NAME=test-profile",
-]
-```
-
-All test environment variables are centralized here rather than scattered across test files. Note that `POWERTOOLS_IDEMPOTENCY_DISABLED=true` is only active during test runs — in production, this env var is not set, so idempotency is fully active against the DynamoDB table.
+All test environment variables are centralized in `pyproject.toml` rather than scattered across test files. Note that `POWERTOOLS_IDEMPOTENCY_DISABLED=true` is only active during test runs — in production, this env var is not set, so idempotency is fully active against the DynamoDB table.
 
 ```bash
 python -m pytest tests/integration -v
@@ -248,15 +234,26 @@ python -m pytest tests/ --randomly-seed=12345        # replay a specific seed
 
 ### Coverage
 
-Coverage runs automatically on every test run via `addopts = --cov=lambda --cov-report=term-missing` in `pyproject.toml`. To generate an HTML report instead:
+Coverage runs automatically on every test run. Key flags set in `pyproject.toml`:
+
+| Flag | Effect |
+|---|---|
+| `--cov=lambda` | Measures coverage for the `lambda/` source directory |
+| `--cov-branch` | Tracks branch coverage (not just whether a line executed, but whether all conditional paths did) |
+| `--cov-report=term-missing` | Prints uncovered line numbers in the terminal |
+| `--cov-report=html` | Generates `htmlcov/index.html` for detailed browsing |
+| `--cov-fail-under=100` | Fails the run if total coverage drops below 100% |
+| `--no-cov-on-fail` | Skips the coverage report when tests fail (avoids misleading partial output) |
+
+To open the HTML report after a test run:
 
 ```bash
-python -m pytest tests/unit --cov-report=html
+open htmlcov/index.html
 ```
 
 ### Parallel execution
 
-Tests run in parallel automatically via `addopts = -n auto` in `pyproject.toml`. pytest-xdist distributes tests across CPU cores. To disable it for debugging:
+Tests run in parallel automatically via `-n auto` in `addopts` (`pyproject.toml`). pytest-xdist distributes tests across CPU cores. To disable it for debugging:
 
 ```bash
 python -m pytest tests/ -n0
@@ -264,11 +261,11 @@ python -m pytest tests/ -n0
 
 ### HTML report
 
-An HTML test report (`report.html`) is generated automatically on every test run via `addopts = --html=report.html --self-contained-html` in `pyproject.toml`. Open it in a browser to view detailed results.
+An HTML test report (`report.html`) is generated automatically on every test run via `--html=report.html --self-contained-html` in `addopts` (`pyproject.toml`). Open it in a browser to view detailed results.
 
 ## Linting and static analysis
 
-This project uses several tools for code quality, all configured in `pyproject.toml` (except bandit which uses `.bandit`):
+This project uses several tools for code quality. Most are configured in `pyproject.toml`; bandit uses a separate `.bandit` file.
 
 ```bash
 # Lint with ruff
@@ -294,13 +291,133 @@ radon cc lambda/ -a
 xenon lambda/ -b B -m A -a A
 ```
 
+### Bandit configuration (`.bandit`)
+
+Bandit is a security-focused static analyzer that scans Python source code for common vulnerabilities. Its configuration lives in `.bandit` rather than `pyproject.toml` because the pre-commit bandit hook reads YAML config files by convention.
+
+The `.bandit` file specifies which directories to exclude from scanning:
+
+| Directory | Reason excluded |
+|---|---|
+| `tests/` | Test code uses `assert`, hardcoded strings, and other patterns that trigger false positives |
+| `cdk.out/` | CDK-generated CloudFormation output — not code you write or can fix |
+| `.venv/` | Third-party packages — vulnerabilities here are caught by `pip-audit` instead |
+
+Everything outside these directories — `lambda/` and `hello_world/` — is scanned. That is the code you own and ship.
+
+## pyproject.toml configuration
+
+All tool configuration is consolidated in `pyproject.toml`. Here is a summary of the key settings in each section:
+
+### `[tool.ruff]`
+
+| Setting | Value | Purpose |
+|---|---|---|
+| `target-version` | `py312` | Enables Python 3.12-specific lint rules and syntax modernization |
+| `line-length` | `120` | Maximum line length enforced by the formatter |
+| `dummy-variable-rgx` | `^(_+\|...)$` | Allows `_`-prefixed variables to be unused without triggering a lint warning |
+
+### `[tool.ruff.lint]`
+
+Ruff is configured with a broad set of rule groups. Each group targets a specific class of issue:
+
+| Code | Plugin | What it catches |
+|---|---|---|
+| `E` / `W` | pycodestyle | Style errors and warnings |
+| `F` | pyflakes | Undefined names, unused imports |
+| `I` | isort | Import ordering |
+| `C` | flake8-comprehensions | Inefficient list/dict/set comprehensions |
+| `B` | flake8-bugbear | Likely bugs and design issues |
+| `S` | flake8-bandit | Security anti-patterns |
+| `UP` | pyupgrade | Modernize syntax to the target Python version |
+| `SIM` | flake8-simplify | Suggest simpler code patterns |
+| `RUF` | ruff-specific | Ruff's own opinionated rules |
+| `T20` | flake8-print | Catches `print()` calls — use Powertools Logger instead |
+| `PT` | flake8-pytest-style | Enforces pytest conventions (fixtures, raises, etc.) |
+| `N` | pep8-naming | Naming conventions (snake_case, PascalCase, SCREAMING_SNAKE) |
+| `RET` | flake8-return | Unnecessary `else` after `return`, redundant return values |
+
+### `[tool.mypy]`
+
+| Setting | Purpose |
+|---|---|
+| `warn_return_any` | Warns when a typed function returns `Any`, which often masks missing type coverage |
+| `warn_unused_ignores` | Warns when a `# type: ignore` comment is no longer needed, preventing stale suppression comments |
+| `disallow_untyped_defs` | Every function must have complete type annotations |
+| `check_untyped_defs` | Type-checks function bodies even if the function itself lacks annotations |
+| `no_implicit_optional` | `f(x: str = None)` does not implicitly mean `Optional[str]` — must be explicit |
+| `ignore_missing_imports` | Suppresses errors for third-party packages without type stubs (e.g. aws-lambda-powertools) |
+| `show_error_codes` | Prints `[error-code]` next to each error — required to write precise `# type: ignore[code]` comments |
+
+### `[tool.pylint.design]`
+
+Structural complexity thresholds. Pylint fails if any function or class exceeds these limits. Complexity is also enforced by the xenon pre-commit hook (which uses radon under the hood).
+
+| Threshold | Value | What it limits |
+|---|---|---|
+| `max-args` | 8 | Parameters per function |
+| `max-locals` | 20 | Local variables per function |
+| `max-returns` | 6 | Return statements per function |
+| `max-branches` | 12 | Branches (if/for/while/try) per function |
+| `max-statements` | 50 | Statements per function body |
+| `max-attributes` | 10 | Instance attributes per class |
+
+### `[tool.pytest.ini_options]`
+
+Key flags in `addopts`:
+
+| Flag | Purpose |
+|---|---|
+| `-ra` | Prints a short summary of all non-passed tests (failures, errors, skipped) at the end |
+| `--cov=lambda` | Measures coverage for the `lambda/` directory |
+| `--cov-branch` | Tracks branch coverage — not just whether a line ran, but whether all conditional paths did |
+| `--cov-fail-under=100` | Fails the run if total coverage drops below 100% |
+| `--no-cov-on-fail` | Skips coverage reporting when tests fail (avoids misleading partial results) |
+| `-n auto` | Runs tests in parallel across all available CPU cores (pytest-xdist) |
+
+`log_cli = true` and `log_cli_level = "WARNING"` stream log output in real time during the test run, showing only WARNING and above to reduce noise.
+
+## Security
+
+Security is enforced at three layers, each covering a different surface area:
+
+| Layer | Tool | What it scans | When it runs |
+|---|---|---|---|
+| **Source code** | bandit | `lambda/` and `hello_world/` for security anti-patterns (hardcoded secrets, shell injection, unsafe deserialization, etc.) | Pre-commit hook on every commit; CI quality job |
+| **Dependencies** | pip-audit | All three requirements files for packages with known CVEs | Pre-commit hook on every commit; weekly Dependency Audit workflow |
+| **Infrastructure** | cdk-nag | CDK stack against AWS Solutions security rules | `cdk synth` — findings are printed and fail synthesis if unsuppressed |
+
+These tools are complementary — no single one covers all three surfaces. Bandit catches code-level issues, pip-audit catches supply chain issues, and cdk-nag catches infrastructure misconfigurations.
+
 ## Pre-commit hooks
 
-Pre-commit is configured in `.pre-commit-config.yaml` to run ruff, mypy, pylint, bandit, xenon (complexity threshold enforcement), and pip-audit (dependency vulnerability scanning) automatically on each commit. Set it up with:
+Pre-commit runs a chain of hooks automatically on every `git commit`. Hooks are defined in `.pre-commit-config.yaml`. Set it up once after cloning:
 
 ```bash
 pre-commit install
 ```
+
+To run all hooks manually without committing (useful before pushing or after changing config):
+
+```bash
+pre-commit run --all-files
+```
+
+### Hook reference
+
+| Hook | Source | What it does |
+|---|---|---|
+| `ruff` | astral-sh/ruff-pre-commit | Lints and auto-fixes code (runs before formatting) |
+| `ruff-format` | astral-sh/ruff-pre-commit | Formats code (equivalent to black) |
+| `mypy` | mirrors-mypy | Static type checking on `hello_world/` (excludes `app.py` and `tests/`) |
+| `bandit` | PyCQA/bandit | Security-focused static analysis on `lambda/` and `hello_world/` |
+| `pylint` | local | Design and complexity checks on non-test, non-docs Python files |
+| `trailing-whitespace` | pre-commit-hooks | Removes trailing whitespace |
+| `end-of-file-fixer` | pre-commit-hooks | Ensures every file ends with a newline |
+| `check-yaml` | pre-commit-hooks | Validates YAML syntax |
+| `check-json` | pre-commit-hooks | Validates JSON syntax |
+| `xenon` | local | Enforces cyclomatic complexity thresholds on `lambda/` (max absolute: B, module: A, average: A) |
+| `pip-audit` | local | Scans all installed dependencies for known CVEs (runs on every commit) |
 
 ## GitHub Actions
 

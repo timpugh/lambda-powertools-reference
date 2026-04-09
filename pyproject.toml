@@ -3,73 +3,127 @@ name = "hello-world"
 version = "0.1.0"
 requires-python = ">=3.12"
 
-# --- Ruff ---
+# =============================================================================
+# Ruff — fast Python linter and formatter (replaces flake8, isort, and black)
+# =============================================================================
 [tool.ruff]
 target-version = "py312"
 line-length = 120
 exclude = [".venv", "cdk.out", "docs", "__pycache__"]
+# Allows _-prefixed variables (e.g. _, _unused) to be unused without warnings
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
 [tool.ruff.lint]
 select = [
     "E",    # pycodestyle errors
     "W",    # pycodestyle warnings
-    "F",    # pyflakes
-    "I",    # isort
-    "B",    # flake8-bugbear
-    "S",    # flake8-bandit
-    "UP",   # pyupgrade
-    "SIM",  # flake8-simplify
+    "F",    # pyflakes — unused imports, undefined names
+    "I",    # isort — import ordering
+    "C",    # flake8-comprehensions — inefficient list/dict/set comprehensions
+    "B",    # flake8-bugbear — likely bugs and design issues
+    "S",    # flake8-bandit — security checks
+    "UP",   # pyupgrade — modernize syntax for the target Python version
+    "SIM",  # flake8-simplify — suggest simpler code patterns
     "RUF",  # ruff-specific rules
+    "T20",  # flake8-print — catches print() (use Logger instead in Lambda)
+    "PT",   # flake8-pytest-style — enforces pytest conventions
+    "N",    # pep8-naming — snake_case functions, PascalCase classes, SCREAMING_SNAKE constants
+    "RET",  # flake8-return — unnecessary else after return, missing/redundant return values
 ]
 ignore = [
     "S101",  # allow assert in tests
+    "E203",  # whitespace before ':' (formatter handles this)
+    "E501",  # line-too-long (formatter enforces line-length instead)
+    "W191",  # indentation contains tabs
 ]
 
+# Controls ruff format (the formatter, equivalent to black)
+[tool.ruff.format]
+quote-style = "double"  # enforce double quotes throughout
+indent-style = "space"  # spaces, not tabs
+line-ending = "auto"    # detect line endings per file (LF on Unix, CRLF on Windows)
+
+# Controls how imports are grouped and sorted (replaces isort)
+[tool.ruff.lint.isort]
+# Ensures these packages sort into the third-party group rather than first-party
+known-third-party = ["aws_lambda_powertools", "boto3"]
+
 [tool.ruff.lint.per-file-ignores]
+# E402: module-level import not at top of file — __init__.py sometimes needs setup code first
+"__init__.py" = ["E402"]
+# S101: assert statements — valid in pytest; S106: hardcoded password — false positive on fixtures
 "tests/**/*.py" = ["S101", "S106"]
 
-# --- Mypy ---
+# =============================================================================
+# Mypy — static type checker
+# All settings tighten type safety beyond mypy's permissive defaults.
+# =============================================================================
 [tool.mypy]
 python_version = "3.12"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = true
-ignore_missing_imports = true
+warn_return_any = true          # warn when a typed function returns Any (often masks missing types)
+warn_unused_configs = true      # warn if a mypy config section is unused or misspelled
+warn_unused_ignores = true      # warn if a # type: ignore comment is no longer needed (prevents rot)
+disallow_untyped_defs = true    # every function must have complete type annotations
+check_untyped_defs = true       # type-check function bodies even if the function lacks annotations
+no_implicit_optional = true     # f(x: str = None) does not implicitly mean Optional[str]
+ignore_missing_imports = true   # suppress errors for third-party packages without type stubs
+show_error_codes = true         # print [error-code] next to each error (required for type: ignore[code])
 
-# --- Pylint ---
+# =============================================================================
+# Pylint — design and complexity checks that complement ruff's style checks
+# Disabled rules are handled by ruff or produce false positives in this project.
+# =============================================================================
 [tool.pylint."messages control"]
 disable = [
-    "C0114",  # missing-module-docstring
+    "C0114",  # missing-module-docstring (not enforced in this project)
     "C0115",  # missing-class-docstring
     "C0116",  # missing-function-docstring
     "C0301",  # line-too-long (ruff handles this)
-    "C0303",  # trailing-whitespace
-    "C0304",  # missing-final-newline
-    "C0305",  # trailing-newlines
-    "C0411",  # wrong-import-order (ruff isort)
-    "E0401",  # import-error (mypy handles this)
-    "E1120",  # no-value-for-parameter (false positive on decorators)
-    "R0903",  # too-few-public-methods
-    "W0611",  # unused-import (ruff F401)
-    "W0612",  # unused-variable (ruff F841)
-    "W0613",  # unused-argument
+    "C0303",  # trailing-whitespace (ruff handles this)
+    "C0304",  # missing-final-newline (ruff handles this)
+    "C0305",  # trailing-newlines (ruff handles this)
+    "C0411",  # wrong-import-order (ruff isort handles this)
+    "E0401",  # import-error (mypy handles this more accurately)
+    "E1120",  # no-value-for-argument (false positive on Powertools decorators)
+    "R0903",  # too-few-public-methods (acceptable for CDK constructs and data classes)
+    "W0611",  # unused-import (ruff F401 handles this)
+    "W0612",  # unused-variable (ruff F841 handles this)
+    "W0613",  # unused-argument (unavoidable with some decorator signatures)
 ]
 
 [tool.pylint.format]
-max-line-length = 120
+max-line-length = 120  # must match [tool.ruff] line-length above
 
+# Structural complexity thresholds — pylint fails if any function or class exceeds these.
+# Complexity is also enforced via the xenon pre-commit hook.
 [tool.pylint.design]
-max-args = 8
-max-locals = 20
-max-returns = 6
-max-branches = 12
-max-statements = 50
-max-attributes = 10
+max-args = 8         # max parameters per function
+max-locals = 20      # max local variables per function
+max-returns = 6      # max return statements per function
+max-branches = 12    # max branches (if/for/while/try) per function
+max-statements = 50  # max statements per function body
+max-attributes = 10  # max instance attributes per class
 
-# --- Pytest ---
+# =============================================================================
+# Pytest — test runner configuration
+# =============================================================================
 [tool.pytest.ini_options]
-timeout = 30
-addopts = "--cov=lambda --cov-report=term-missing -n auto --html=report.html --self-contained-html"
+testpaths = ["tests"]  # only collect tests from tests/ (avoids scanning the whole project)
+timeout = 30           # fail any test that runs longer than 30 seconds (pytest-timeout)
+addopts = [
+    "-ra",                       # print a short summary of all non-passed tests at the end
+    "--cov=lambda",              # measure coverage for the lambda/ source directory
+    "--cov-branch",              # track branch coverage (not just line coverage)
+    "--cov-report=term-missing", # show uncovered line numbers in the terminal output
+    "--cov-report=html",         # also generate an HTML coverage report
+    "--cov-fail-under=100",      # fail the run if total coverage drops below 100%
+    "--no-cov-on-fail",          # skip coverage reporting when tests fail (avoids misleading output)
+    "-n", "auto",                # run tests in parallel across all CPU cores (pytest-xdist)
+    "--html=report.html",        # generate an HTML test results report (pytest-html)
+    "--self-contained-html",     # embed all assets into the HTML file (no external dependencies)
+]
+log_cli = true          # stream log output in real time during the test run
+log_cli_level = "WARNING"  # only show WARNING and above (suppress DEBUG/INFO noise)
 env = [
     "AWS_SAM_STACK_NAME=HelloWorld",
     "POWERTOOLS_IDEMPOTENCY_DISABLED=true",
@@ -82,4 +136,18 @@ env = [
     "APPCONFIG_APP_NAME=test-app",
     "APPCONFIG_ENV_NAME=test-env",
     "APPCONFIG_PROFILE_NAME=test-profile",
+]
+
+# =============================================================================
+# Coverage — controls pytest-cov and standalone `coverage` runs
+# =============================================================================
+[tool.coverage.run]
+source = ["lambda"]  # measure coverage for the lambda/ directory only
+omit = ["tests/*"]   # exclude test files themselves from coverage measurement
+branch = true        # track branch coverage in addition to line coverage
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",  # manual opt-out on a per-line basis
+    "if TYPE_CHECKING:",  # type-only imports are never executed at runtime
 ]
