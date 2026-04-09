@@ -235,7 +235,7 @@ class HelloWorldStack(Stack):
         resource_group = rg.CfnGroup(
             self,
             "ApplicationResourceGroup",
-            name=f"ApplicationInsights-SAM-{self.stack_name}",
+            name=f"ApplicationInsights-{self.stack_name}",
             resource_query=rg.CfnGroup.ResourceQueryProperty(
                 type="CLOUDFORMATION_STACK_1_0",
             ),
