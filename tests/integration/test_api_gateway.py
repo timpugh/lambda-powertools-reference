@@ -8,7 +8,7 @@ import requests
 
 
 class TestApiGateway:
-    @pytest.fixture()
+    @pytest.fixture
     def api_gateway_url(self):
         """Get the API Gateway URL from Cloudformation Stack outputs"""
         stack_name = os.environ.get("AWS_SAM_STACK_NAME")

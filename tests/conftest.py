@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.abspath(LAMBDA_DIR))
 import app as lambda_app  # noqa: E402
 
 
-@pytest.fixture()
+@pytest.fixture
 def apigw_event():
     """Generates API GW Event for GET /hello."""
     return {
@@ -45,7 +45,7 @@ def apigw_event():
     }
 
 
-@pytest.fixture()
+@pytest.fixture
 def lambda_context(mocker):
     """Mock Lambda context using pytest-mock."""
     context = mocker.MagicMock()
@@ -56,7 +56,7 @@ def lambda_context(mocker):
     return context
 
 
-@pytest.fixture()
+@pytest.fixture
 def lambda_app_module():
     """Provide the Lambda app module for direct access in tests."""
     return lambda_app
