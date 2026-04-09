@@ -60,7 +60,7 @@ class HelloWorldWafStack(Stack):
                     override_action=wafv2.CfnWebACL.OverrideActionProperty(none={}),
                     visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
                         cloud_watch_metrics_enabled=True,
-                        metric_name="AWSManagedRulesAmazonIpReputationList",
+                        metric_name=f"{self.stack_name}-IpReputationList",
                         sampled_requests_enabled=True,
                     ),
                 ),
@@ -77,7 +77,7 @@ class HelloWorldWafStack(Stack):
                     override_action=wafv2.CfnWebACL.OverrideActionProperty(none={}),
                     visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
                         cloud_watch_metrics_enabled=True,
-                        metric_name="AWSManagedRulesCommonRuleSet",
+                        metric_name=f"{self.stack_name}-CommonRuleSet",
                         sampled_requests_enabled=True,
                     ),
                 ),
@@ -94,7 +94,7 @@ class HelloWorldWafStack(Stack):
                     override_action=wafv2.CfnWebACL.OverrideActionProperty(none={}),
                     visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
                         cloud_watch_metrics_enabled=True,
-                        metric_name="AWSManagedRulesKnownBadInputsRuleSet",
+                        metric_name=f"{self.stack_name}-KnownBadInputs",
                         sampled_requests_enabled=True,
                     ),
                 ),
@@ -112,7 +112,7 @@ class HelloWorldWafStack(Stack):
                     ),
                     visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
                         cloud_watch_metrics_enabled=True,
-                        metric_name="RateLimitPerIP",
+                        metric_name=f"{self.stack_name}-RateLimitPerIP",
                         sampled_requests_enabled=True,
                     ),
                 ),

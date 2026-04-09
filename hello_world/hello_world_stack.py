@@ -101,14 +101,14 @@ class HelloWorldStack(Stack):
             self,
             "FeatureFlagsEnv",
             application_id=app_config_app.ref,
-            name="production",
+            name=f"{self.stack_name}-env",
         )
 
         app_config_profile = appconfig.CfnConfigurationProfile(
             self,
             "FeatureFlagsProfile",
             application_id=app_config_app.ref,
-            name="features",
+            name=f"{self.stack_name}-features",
             location_uri="hosted",
             type="AWS.AppConfig.FeatureFlags",
         )
@@ -157,8 +157,8 @@ class HelloWorldStack(Stack):
                 "IDEMPOTENCY_TABLE_NAME": idempotency_table.table_name,
                 "GREETING_PARAM_NAME": f"/{self.stack_name}/greeting",
                 "APPCONFIG_APP_NAME": f"{self.stack_name}-features",
-                "APPCONFIG_ENV_NAME": "production",
-                "APPCONFIG_PROFILE_NAME": "features",
+                "APPCONFIG_ENV_NAME": f"{self.stack_name}-env",
+                "APPCONFIG_PROFILE_NAME": f"{self.stack_name}-features",
             },
         )
 

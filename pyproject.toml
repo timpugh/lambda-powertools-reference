@@ -135,8 +135,8 @@ env = [
     "IDEMPOTENCY_TABLE_NAME=test-idempotency",
     "GREETING_PARAM_NAME=/test/greeting",
     "APPCONFIG_APP_NAME=test-app",
-    "APPCONFIG_ENV_NAME=test-env",
-    "APPCONFIG_PROFILE_NAME=test-profile",
+    "APPCONFIG_ENV_NAME=HelloWorld-test-env",
+    "APPCONFIG_PROFILE_NAME=HelloWorld-test-features",
 ]
 
 # =============================================================================
