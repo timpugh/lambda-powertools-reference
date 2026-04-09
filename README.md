@@ -18,6 +18,8 @@ This project contains source code and supporting files for a serverless applicat
 - `pyproject.toml` - Consolidated tool configuration (ruff, mypy, pylint, pytest, coverage)
 - `.pre-commit-config.yaml` - Pre-commit hook definitions (runs on every `git commit`)
 - `.bandit` - Bandit security scanner configuration (excluded directories)
+- `.github/dependabot.yml` - Dependabot configuration (weekly GitHub Actions version checks)
+- `.github/workflows/dependabot-auto-merge.yml` - Auto-merges Dependabot PRs when CI passes
 
 The application uses several AWS resources, including Lambda functions, an API Gateway API, a DynamoDB table, SSM parameters, and AppConfig. These resources are defined in the `hello_world/hello_world_stack.py` file in this project. The Lambda function uses [AWS Lambda Powertools](https://docs.powertools.aws.dev/lambda/python/latest/) extensively — see the [Lambda Powertools features](#lambda-powertools-features) section below for details. Note that Powertools Tracer currently depends on the `aws-xray-sdk`, which is approaching deprecation. There is an [open RFC](https://github.com/aws-powertools/powertools-lambda/discussions/90) to replace it with OpenTelemetry as the tracing provider. You can update the stack to add AWS resources through the same deployment process that updates your application code.
 
@@ -421,19 +423,31 @@ pre-commit run --all-files
 
 ## GitHub Actions
 
-Three workflows run automatically on push to `main`:
+Four workflows are configured:
 
 | Workflow | Trigger | What it does |
 |---|---|---|
 | **CI** | Push / PR to `main` | Runs pre-commit hooks (quality job) and pytest unit tests (test job) |
 | **Docs** | Push to `main` | Builds Sphinx docs and deploys to GitHub Pages |
 | **Dependency Audit** | Every Monday 9am UTC | Runs `pip-audit` across all requirements files |
+| **Dependabot Auto-merge** | Dependabot PRs | Approves and auto-merges GitHub Actions version updates when CI passes |
 
 Both the `quality` and `test` CI jobs must pass before anything can merge to `main` (branch protection).
 
 The CI installs dependencies with `pip-sync` to match the local dev workflow exactly:
 - `quality` job: `pip-sync requirements.txt`
 - `test` job: `pip-sync tests/requirements.txt lambda/requirements.txt`
+
+### Dependabot
+
+Dependabot is configured in `.github/dependabot.yml` to check for GitHub Actions version updates every Monday. When a newer version of an action is available (e.g. `actions/checkout@v4` → a newer release), Dependabot opens a PR automatically.
+
+The `dependabot-auto-merge` workflow then:
+1. Confirms the PR is a GitHub Actions ecosystem update (not pip)
+2. Approves it
+3. Enables auto-merge — GitHub merges it automatically once CI passes
+
+This keeps workflow action versions current without any manual intervention. If CI fails on a Dependabot PR, it stays open for investigation rather than merging.
 
 ## CDK security checks
 
