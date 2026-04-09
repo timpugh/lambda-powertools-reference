@@ -22,9 +22,6 @@ from aws_cdk import (
 from aws_cdk import (
     aws_s3_deployment as s3deploy,
 )
-from aws_cdk import (
-    aws_wafv2 as wafv2,
-)
 from cdk_nag import AwsSolutionsChecks, NagSuppressions
 from constructs import Construct
 
@@ -32,19 +29,24 @@ from constructs import Construct
 class HelloWorldFrontendStack(Stack):
     """CDK stack for the Hello World frontend.
 
-    Provisions a private S3 bucket for static assets, a WAF WebACL with AWS
-    managed rule groups, and a CloudFront distribution with OAC, HTTPS-only
-    enforcement, security response headers, and automatic cache invalidation
-    on deploy.
+    Provisions a private S3 bucket for static assets and a CloudFront
+    distribution with OAC, HTTPS-only enforcement, and security response
+    headers. WAF protection is provided by a WebACL ARN passed in from
+    HelloWorldWafStack, which is always deployed in us-east-1.
+
+    This stack can be deployed to any region. When the target region differs
+    from us-east-1, CDK bridges the WAF ARN cross-region automatically via
+    SSM Parameter Store (enabled by cross_region_references=True in app.py).
     """
 
-    def __init__(self, scope: Construct, construct_id: str, api_url: str, **kwargs: Any) -> None:
+    def __init__(self, scope: Construct, construct_id: str, api_url: str, waf_acl_arn: str, **kwargs: Any) -> None:
         """Provision all frontend AWS resources.
 
         Args:
             scope: The CDK construct scope.
             construct_id: The unique identifier for this stack.
             api_url: The backend API Gateway URL, injected into config.json at deploy time.
+            waf_acl_arn: ARN of the WAF WebACL from HelloWorldWafStack (always in us-east-1).
             **kwargs: Additional keyword arguments passed to the parent Stack.
         """
         super().__init__(scope, construct_id, **kwargs)
@@ -62,91 +64,6 @@ class HelloWorldFrontendStack(Stack):
             versioned=False,
             removal_policy=RemovalPolicy.DESTROY,
             auto_delete_objects=True,
-        )
-
-        # ── WAF WebACL ───────────────────────────────────────────────────────
-        # scope=CLOUDFRONT requires the stack to be deployed in us-east-1.
-        web_acl = wafv2.CfnWebACL(
-            self,
-            "WebACL",
-            scope="CLOUDFRONT",
-            default_action=wafv2.CfnWebACL.DefaultActionProperty(allow={}),
-            visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
-                cloud_watch_metrics_enabled=True,
-                metric_name=f"{self.stack_name}WebACL",
-                sampled_requests_enabled=True,
-            ),
-            rules=[
-                # Blocks IPs with a poor reputation (scanners, botnets, TOR exits)
-                wafv2.CfnWebACL.RuleProperty(
-                    name="AWSManagedRulesAmazonIpReputationList",
-                    priority=0,
-                    statement=wafv2.CfnWebACL.StatementProperty(
-                        managed_rule_group_statement=wafv2.CfnWebACL.ManagedRuleGroupStatementProperty(
-                            vendor_name="AWS",
-                            name="AWSManagedRulesAmazonIpReputationList",
-                        )
-                    ),
-                    override_action=wafv2.CfnWebACL.OverrideActionProperty(none={}),
-                    visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
-                        cloud_watch_metrics_enabled=True,
-                        metric_name="AWSManagedRulesAmazonIpReputationList",
-                        sampled_requests_enabled=True,
-                    ),
-                ),
-                # Core rule set — protects against OWASP Top 10 web exploits
-                wafv2.CfnWebACL.RuleProperty(
-                    name="AWSManagedRulesCommonRuleSet",
-                    priority=1,
-                    statement=wafv2.CfnWebACL.StatementProperty(
-                        managed_rule_group_statement=wafv2.CfnWebACL.ManagedRuleGroupStatementProperty(
-                            vendor_name="AWS",
-                            name="AWSManagedRulesCommonRuleSet",
-                        )
-                    ),
-                    override_action=wafv2.CfnWebACL.OverrideActionProperty(none={}),
-                    visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
-                        cloud_watch_metrics_enabled=True,
-                        metric_name="AWSManagedRulesCommonRuleSet",
-                        sampled_requests_enabled=True,
-                    ),
-                ),
-                # Blocks requests containing known malicious inputs (SQLi, XSS patterns)
-                wafv2.CfnWebACL.RuleProperty(
-                    name="AWSManagedRulesKnownBadInputsRuleSet",
-                    priority=2,
-                    statement=wafv2.CfnWebACL.StatementProperty(
-                        managed_rule_group_statement=wafv2.CfnWebACL.ManagedRuleGroupStatementProperty(
-                            vendor_name="AWS",
-                            name="AWSManagedRulesKnownBadInputsRuleSet",
-                        )
-                    ),
-                    override_action=wafv2.CfnWebACL.OverrideActionProperty(none={}),
-                    visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
-                        cloud_watch_metrics_enabled=True,
-                        metric_name="AWSManagedRulesKnownBadInputsRuleSet",
-                        sampled_requests_enabled=True,
-                    ),
-                ),
-                # Rate limiting — blocks a single IP exceeding 1000 requests per 5 minutes.
-                # Prevents scraping, credential stuffing, and unintentional runaway clients.
-                wafv2.CfnWebACL.RuleProperty(
-                    name="RateLimitPerIP",
-                    priority=3,
-                    action=wafv2.CfnWebACL.RuleActionProperty(block={}),
-                    statement=wafv2.CfnWebACL.StatementProperty(
-                        rate_based_statement=wafv2.CfnWebACL.RateBasedStatementProperty(
-                            limit=1000,
-                            aggregate_key_type="IP",
-                        )
-                    ),
-                    visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
-                        cloud_watch_metrics_enabled=True,
-                        metric_name="RateLimitPerIP",
-                        sampled_requests_enabled=True,
-                    ),
-                ),
-            ],
         )
 
         # ── CloudFront distribution ──────────────────────────────────────────
@@ -174,7 +91,7 @@ class HelloWorldFrontendStack(Stack):
                 ),
             ],
             minimum_protocol_version=cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
-            web_acl_id=web_acl.attr_arn,
+            web_acl_id=waf_acl_arn,
         )
 
         # ── Deploy frontend assets ───────────────────────────────────────────
