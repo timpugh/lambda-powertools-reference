@@ -156,24 +156,47 @@ finch vm start
 # Set Finch as the container runtime for CDK
 export CDK_DOCKER=finch
 
-# Bootstrap CDK (first time only)
-cdk bootstrap
+# Bootstrap CDK in us-east-1 (always required — WAF stack always deploys here)
+cdk bootstrap aws://YOUR_ACCOUNT_ID/us-east-1
 
-# Deploy the stack
-cdk deploy
+# Deploy all stacks to us-east-1 (default)
+cdk deploy --all
 ```
 
 The `cdk synth` and `cdk deploy` commands use Finch to build a container that installs the Lambda dependencies from `lambda/requirements.txt` into the deployment package. The first run will be slower as it pulls the SAM build image.
 
 You can find your API Gateway Endpoint URL in the output values displayed after deployment.
 
+### Deploying to a different region
+
+Each target region must be bootstrapped before its first deploy. Bootstrap is a one-time step per region per account.
+
+```bash
+# Bootstrap the target region (in addition to us-east-1 which is always needed)
+cdk bootstrap aws://YOUR_ACCOUNT_ID/ap-southeast-1
+
+# Deploy all stacks — WAF stays in us-east-1, backend and frontend go to ap-southeast-1
+cdk deploy --all -c region=ap-southeast-1
+```
+
+### Destroying a deployment
+
+```bash
+# Destroy the default us-east-1 deployment
+cdk destroy --all
+
+# Destroy a specific regional deployment (does not affect other regions)
+cdk destroy --all -c region=ap-southeast-1
+```
+
 ## Useful CDK commands
 
-* `cdk ls`          list all stacks in the app
-* `cdk synth`       emit the synthesized CloudFormation template
-* `cdk deploy`      deploy this stack to your default AWS account/region
-* `cdk diff`        compare deployed stack with current state
-* `cdk destroy`     destroy the deployed stack
+* `cdk ls`                         list all stacks in the app
+* `cdk synth`                      emit the synthesized CloudFormation template
+* `cdk deploy --all`               deploy all stacks to us-east-1 (default)
+* `cdk deploy --all -c region=X`   deploy all stacks to region X
+* `cdk diff`                       compare deployed stack with current state
+* `cdk destroy --all`              destroy all stacks in the default region
 
 ## Use the CDK to build and test locally
 
