@@ -10,6 +10,7 @@ import os
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
+from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
 from aws_lambda_powertools.event_handler.exceptions import InternalServerError
 from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
@@ -26,7 +27,7 @@ from aws_lambda_powertools.utilities.validation import validate
 logger = Logger()
 tracer = Tracer()
 metrics = Metrics()
-app = APIGatewayRestResolver()
+app = APIGatewayRestResolver(cors=CORSConfig(allow_origin="*", max_age=300))
 
 # Idempotency setup
 persistence_layer = DynamoDBPersistenceLayer(

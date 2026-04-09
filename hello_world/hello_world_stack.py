@@ -215,6 +215,10 @@ class HelloWorldStack(Stack):
 
         hello_resource = api.root.add_resource("hello")
         hello_resource.add_method("GET", apigw.LambdaIntegration(hello_fn))
+        hello_resource.add_cors_preflight(
+            allow_origins=apigw.Cors.ALL_ORIGINS,
+            allow_methods=["GET", "OPTIONS"],
+        )
 
         # Explicit execution log group — API Gateway creates this outside CloudFormation
         # when logging_level is enabled. Pre-creating it here transfers ownership to CFN
@@ -277,6 +281,9 @@ class HelloWorldStack(Stack):
             description="IAM Role created for Hello World function",
             value=cast(iam.IRole, hello_fn.role).role_arn,
         )
+
+        # Expose API URL for consumption by the frontend stack
+        self.api_url = api.url
 
         # cdk-nag suppressions for hello-world sample app
         NagSuppressions.add_stack_suppressions(
