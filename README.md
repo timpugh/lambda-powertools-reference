@@ -412,6 +412,25 @@ Security is enforced at three layers, each covering a different surface area:
 
 These tools are complementary — no single one covers all three surfaces. Bandit catches code-level issues, pip-audit catches supply chain issues, and cdk-nag catches infrastructure misconfigurations.
 
+## Commit message convention
+
+This project follows [Conventional Commits](https://www.conventionalcommits.org/). Format:
+
+```
+type: short description
+```
+
+| Type | When to use |
+|---|---|
+| `feat` | A new feature |
+| `fix` | A bug fix |
+| `docs` | Documentation changes only |
+| `chore` | Maintenance tasks that don't affect functionality (lock files, Makefile, LICENSE) |
+| `ci` | Changes to CI/CD configuration (GitHub Actions, pre-commit) |
+| `test` | Adding or updating tests |
+| `refactor` | Code restructuring that neither fixes a bug nor adds a feature |
+| `build` | Changes to the build system or dependencies |
+
 ## Pre-commit hooks
 
 Pre-commit runs a chain of hooks automatically on every `git commit`. Hooks are defined in `.pre-commit-config.yaml`. Set it up once after cloning:
