@@ -557,11 +557,13 @@ The browser calls `GET /hello` directly from JavaScript against the API Gateway 
 
 This project uses three stacks, not two. WAF lives in its own stack because CloudFront-scoped WAF WebACLs are an AWS hard requirement to exist in `us-east-1` — even if every other resource is in a different region. By isolating WAF into `HelloWorldWafStack`, the backend and frontend can be deployed to any region without duplicating the WAF or violating the constraint.
 
+Each regional deployment gets its own set of three independently named stacks:
+
 | Stack | Region | Contents |
 |-------|--------|----------|
-| `HelloWorldWaf` | Always `us-east-1` | WAF WebACL with all rules |
-| `HelloWorld` | Configurable | Lambda, API Gateway, DynamoDB, SSM, AppConfig |
-| `HelloWorldFrontend` | Configurable | S3, CloudFront (references WAF ARN) |
+| `HelloWorldWaf-{region}` | Always `us-east-1` | WAF WebACL with all rules |
+| `HelloWorld-{region}` | Configurable | Lambda, API Gateway, DynamoDB, SSM, AppConfig |
+| `HelloWorldFrontend-{region}` | Configurable | S3, CloudFront (references WAF ARN) |
 
 **Deploying to us-east-1 (default):**
 
@@ -572,10 +574,20 @@ cdk deploy --all
 **Deploying to a different region:**
 
 ```bash
-cdk deploy --all -c region=eu-west-1
+cdk deploy --all -c region=ap-southeast-1
 ```
 
-WAF stays in `us-east-1`. The backend and frontend deploy to `eu-west-1`. CDK wires the WAF ARN across regions automatically — no manual steps.
+WAF stays in `us-east-1` (always). The backend and frontend deploy to the target region. CDK wires the WAF ARN across regions automatically — no manual steps.
+
+**Destroying a specific regional deployment:**
+
+```bash
+cdk destroy --all -c region=ap-southeast-1
+```
+
+This tears down only the Singapore stack set (`HelloWorldWaf-ap-southeast-1`, `HelloWorld-ap-southeast-1`, `HelloWorldFrontend-ap-southeast-1`). Any other regional deployments are unaffected.
+
+> **WAF cost note** — Each regional deployment provisions its own WAF WebACL at $5/month. This keeps deployments fully independent, which is the right default for a reference architecture. In a production setup with multiple long-lived environments, you could share a single `HelloWorldWaf` stack across all regions and pass its ARN to each frontend stack, eliminating the per-deployment cost. That optimization is intentionally deferred here in favour of deployment independence.
 
 ### How cross-region references work
 

@@ -1,19 +1,26 @@
 #!/usr/bin/env python3
 """CDK application entry point.
 
-Synthesizes three CloudFormation stacks:
+Synthesizes three CloudFormation stacks per deployment, all scoped by region:
 
-  HelloWorldWaf      — WAF WebACL, always in us-east-1 (CloudFront constraint)
-  HelloWorld         — Lambda, API Gateway, DynamoDB, SSM, AppConfig
-  HelloWorldFrontend — S3, CloudFront (references WAF ARN cross-region via SSM)
+  HelloWorldWaf-{region}      — WAF WebACL, physically in us-east-1 (CloudFront
+                                constraint), but named per region so each deployment
+                                is fully independent and can be destroyed separately.
+  HelloWorld-{region}         — Lambda, API Gateway, DynamoDB, SSM, AppConfig
+  HelloWorldFrontend-{region} — S3, CloudFront (references WAF ARN cross-region
+                                via SSM when target region differs from us-east-1)
 
-The target region for the backend and frontend stacks is controlled by the
-``region`` CDK context key. Defaults to us-east-1 if not specified.
+The target region is controlled by the ``region`` CDK context key.
+Defaults to us-east-1 if not specified.
 
 Usage:
-    cdk deploy --all                          # deploy to us-east-1 (default)
-    cdk deploy --all -c region=eu-west-1      # deploy backend/frontend to eu-west-1
-                                              # WAF always stays in us-east-1
+    cdk deploy --all                            # deploy to us-east-1 (default)
+    cdk deploy --all -c region=ap-southeast-1   # deploy a separate Singapore stack set
+
+Each regional deployment is fully independent — destroying one does not affect
+any other. All three stacks for a given region are destroyed together:
+
+    cdk destroy --all -c region=ap-southeast-1
 """
 
 import aws_cdk as cdk
@@ -24,24 +31,25 @@ from hello_world.hello_world_waf_stack import HelloWorldWafStack
 
 app = cdk.App()
 
-# WAF WebACL must always be in us-east-1 — this is an AWS hard requirement
-# for CloudFront-scoped WebACLs, regardless of where other resources live.
-waf = HelloWorldWafStack(
-    app,
-    "HelloWorldWaf",
-    env=cdk.Environment(region="us-east-1"),
-)
-
 # Backend and frontend deploy to the region specified via CDK context.
 # Defaults to us-east-1 when no context value is provided.
 target_region: str = app.node.try_get_context("region") or "us-east-1"
 target_env = cdk.Environment(region=target_region)
 
-backend = HelloWorldStack(app, "HelloWorld", env=target_env)
+# Each regional deployment gets its own WAF WebACL, named by region so stack
+# sets are fully independent. The WebACL is always physically in us-east-1
+# (CloudFront hard requirement) regardless of the target region.
+waf = HelloWorldWafStack(
+    app,
+    f"HelloWorldWaf-{target_region}",
+    env=cdk.Environment(region="us-east-1"),
+)
+
+backend = HelloWorldStack(app, f"HelloWorld-{target_region}", env=target_env)
 
 HelloWorldFrontendStack(
     app,
-    "HelloWorldFrontend",
+    f"HelloWorldFrontend-{target_region}",
     api_url=backend.api_url,
     waf_acl_arn=waf.web_acl_arn,
     env=target_env,

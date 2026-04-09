@@ -35,7 +35,7 @@ from aws_cdk import (
     aws_ssm as ssm,
 )
 from aws_cdk.aws_lambda_python_alpha import PythonFunction
-from cdk_monitoring_constructs import MonitoringFacade
+from cdk_monitoring_constructs import DefaultDashboardFactory, MonitoringFacade
 from cdk_nag import AwsSolutionsChecks, NagSuppressions
 from constructs import Construct
 
@@ -250,6 +250,8 @@ class HelloWorldStack(Stack):
         app_insights.add_dependency(resource_group)
 
         # Monitoring dashboard via cdk-monitoring-constructs
+        # CloudWatch dashboards are global — scope the name to the stack so
+        # multiple regional deployments don't collide on the same dashboard name.
         monitoring = MonitoringFacade(
             self,
             "Monitoring",
@@ -257,6 +259,11 @@ class HelloWorldStack(Stack):
                 "actions_enabled": True,
                 "alarm_name_prefix": self.stack_name,
             },
+            dashboard_factory=DefaultDashboardFactory(
+                self,
+                "MonitoringDashboardFactory",
+                dashboard_name_prefix=self.stack_name,
+            ),
         )
         monitoring.monitor_lambda_function(lambda_function=hello_fn)
         monitoring.monitor_api_gateway(api=api)
