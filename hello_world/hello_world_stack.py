@@ -26,6 +26,9 @@ from aws_cdk import (
     aws_lambda as _lambda,
 )
 from aws_cdk import (
+    aws_logs as logs,
+)
+from aws_cdk import (
     aws_resourcegroups as rg,
 )
 from aws_cdk import (
@@ -122,6 +125,15 @@ class HelloWorldStack(Stack):
             ),
         )
 
+        # Explicit Lambda log group with 30-day retention (implicit group has no retention)
+        lambda_log_group = logs.LogGroup(
+            self,
+            "HelloWorldFunctionLogGroup",
+            log_group_name=f"/aws/lambda/{self.stack_name}-HelloWorldFunction",
+            retention=logs.RetentionDays.ONE_MONTH,
+            removal_policy=RemovalPolicy.DESTROY,
+        )
+
         # Lambda function with automatic dependency bundling
         hello_fn = PythonFunction(
             self,
@@ -133,6 +145,8 @@ class HelloWorldStack(Stack):
             architecture=_lambda.Architecture.X86_64,
             timeout=Duration.seconds(10),
             tracing=_lambda.Tracing.ACTIVE,
+            log_group=lambda_log_group,
+            logging_format=_lambda.LoggingFormat.JSON,
             environment={
                 "POWERTOOLS_SERVICE_NAME": "hello-world",
                 "POWERTOOLS_METRICS_NAMESPACE": "HelloWorld",
@@ -159,13 +173,41 @@ class HelloWorldStack(Stack):
             )
         )
 
+        # Explicit API Gateway access log group with 30-day retention
+        api_log_group = logs.LogGroup(
+            self,
+            "HelloWorldApiAccessLogs",
+            log_group_name=f"/aws/apigateway/{self.stack_name}/access-logs",
+            retention=logs.RetentionDays.ONE_MONTH,
+            removal_policy=RemovalPolicy.DESTROY,
+        )
+
         # API Gateway REST API
+        # cloud_watch_role=True (default) creates an implicit IAM role scoped to
+        # allow API Gateway to write execution logs to CloudWatch — this is a
+        # region-level account setting managed by CDK automatically.
         api = apigw.RestApi(
             self,
             "HelloWorldApi",
+            cloud_watch_role=True,
+            cloud_watch_role_removal_policy=RemovalPolicy.DESTROY,
             deploy_options=apigw.StageOptions(
                 stage_name="Prod",
                 tracing_enabled=True,
+                access_log_destination=apigw.LogGroupLogDestination(api_log_group),
+                access_log_format=apigw.AccessLogFormat.json_with_standard_fields(
+                    caller=True,
+                    http_method=True,
+                    ip=True,
+                    protocol=True,
+                    request_time=True,
+                    resource_path=True,
+                    response_length=True,
+                    status=True,
+                    user=True,
+                ),
+                logging_level=apigw.MethodLoggingLevel.INFO,
+                data_trace_enabled=False,
             ),
         )
 
@@ -227,11 +269,9 @@ class HelloWorldStack(Stack):
         NagSuppressions.add_stack_suppressions(
             self,
             [
-                {"id": "AwsSolutions-APIG1", "reason": "Access logging not needed for sample app"},
                 {"id": "AwsSolutions-APIG2", "reason": "Request validation not needed for sample app"},
                 {"id": "AwsSolutions-APIG3", "reason": "WAF not needed for sample app"},
                 {"id": "AwsSolutions-APIG4", "reason": "Authorization not needed for sample app"},
-                {"id": "AwsSolutions-APIG6", "reason": "CloudWatch logging not needed for sample app"},
                 {"id": "AwsSolutions-COG4", "reason": "Cognito authorizer not needed for sample app"},
                 {"id": "AwsSolutions-DDB3", "reason": "Point-in-time recovery enabled on idempotency table"},
                 {"id": "AwsSolutions-IAM4", "reason": "Managed policies acceptable for sample app"},
