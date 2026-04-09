@@ -627,6 +627,8 @@ pip install -r tests/requirements.txt -r lambda/requirements.txt
 
 **SSM parameter path is hardcoded** — the greeting parameter is stored at `/HelloWorld/greeting` in SSM, matching the stack name. This is intentional for a reference project but would be parameterised in a production stack.
 
+**Error handling** — the handler demonstrates the recommended pattern for production Lambda error handling. Critical downstream failures (SSM) return a 500 via `InternalServerError` so the API always responds with a meaningful HTTP status rather than a Lambda runtime error. Non-critical failures (AppConfig feature flags) fall back to a safe default rather than failing the whole request. As you extend this project, apply the same pattern to any new downstream calls: decide whether the failure is critical (raise `InternalServerError`) or non-critical (log a warning, use a default), and add a corresponding unit test for each path.
+
 ## Cleanup
 
 To delete the application that you created, run:
