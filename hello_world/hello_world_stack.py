@@ -132,7 +132,7 @@ class HelloWorldStack(Stack):
             self,
             "HelloWorldFunctionLogGroup",
             log_group_name=f"/aws/lambda/{self.stack_name}-HelloWorldFunction",
-            retention=logs.RetentionDays.ONE_MONTH,
+            retention=logs.RetentionDays.ONE_WEEK,
             removal_policy=RemovalPolicy.DESTROY,
         )
 
@@ -180,7 +180,7 @@ class HelloWorldStack(Stack):
             self,
             "HelloWorldApiAccessLogs",
             log_group_name=f"/aws/apigateway/{self.stack_name}/access-logs",
-            retention=logs.RetentionDays.ONE_MONTH,
+            retention=logs.RetentionDays.ONE_WEEK,
             removal_policy=RemovalPolicy.DESTROY,
         )
 
