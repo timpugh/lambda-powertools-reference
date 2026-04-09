@@ -517,7 +517,27 @@ This keeps workflow action versions current without any manual intervention. If 
 
 ## CDK security checks
 
-The CDK stack uses [cdk-nag](https://github.com/cdklabs/cdk-nag) with AWS Solutions checks enabled. Security findings are surfaced during `cdk synth`. Suppressions for this sample app are documented inline in `hello_world/hello_world_stack.py`.
+The CDK stack uses [cdk-nag](https://github.com/cdklabs/cdk-nag) with the [AWS Solutions rule pack](https://github.com/cdklabs/cdk-nag/blob/main/RULES.md#awssolutions) applied to every resource at synth time. Any finding that is not suppressed fails `cdk synth` — this means infrastructure misconfigurations are caught before deployment, not after.
+
+Checks run automatically on every `cdk synth` and `cdk deploy`. There is no separate command needed.
+
+### Suppressions
+
+Not every rule is appropriate for a sample application. Where a rule has been intentionally suppressed, the suppression lives at the bottom of `hello_world/hello_world_stack.py` in the `NagSuppressions.add_stack_suppressions` call. Each entry includes a `reason` field explaining why it was suppressed rather than fixed.
+
+Current suppressions:
+
+| Rule | Why suppressed |
+|------|---------------|
+| `AwsSolutions-APIG2` | Request validation model not added for this sample |
+| `AwsSolutions-APIG3` | WAF not attached — cost/complexity not warranted for a sample |
+| `AwsSolutions-APIG4` | No API authorizer — intentional, auth is a TODO item |
+| `AwsSolutions-COG4` | No Cognito authorizer — same as APIG4 |
+| `AwsSolutions-IAM4` | Lambda uses `AWSLambdaBasicExecutionRole` managed policy |
+| `AwsSolutions-IAM5` | AppConfig requires wildcard resource in its IAM policy |
+| `AwsSolutions-L1` | Python 3.12 runtime intentionally pinned rather than using LATEST |
+
+Rules that were previously suppressed and have since been implemented are removed from this list. If you add a suppression, include a clear reason and consider whether it belongs in the TODO list as a future improvement.
 
 ## Monitoring
 

@@ -77,7 +77,9 @@ class HelloWorldStack(Stack):
             time_to_live_attribute="expiration",
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
             removal_policy=RemovalPolicy.DESTROY,
-            point_in_time_recovery=True,
+            point_in_time_recovery_specification=dynamodb.PointInTimeRecoverySpecification(
+                point_in_time_recovery_enabled=True,
+            ),
         )
 
         # SSM parameter for Powertools Parameters
@@ -273,7 +275,6 @@ class HelloWorldStack(Stack):
                 {"id": "AwsSolutions-APIG3", "reason": "WAF not needed for sample app"},
                 {"id": "AwsSolutions-APIG4", "reason": "Authorization not needed for sample app"},
                 {"id": "AwsSolutions-COG4", "reason": "Cognito authorizer not needed for sample app"},
-                {"id": "AwsSolutions-DDB3", "reason": "Point-in-time recovery enabled on idempotency table"},
                 {"id": "AwsSolutions-IAM4", "reason": "Managed policies acceptable for sample app"},
                 {
                     "id": "AwsSolutions-IAM5",
