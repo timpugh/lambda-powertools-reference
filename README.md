@@ -21,6 +21,7 @@ This project contains source code and supporting files for a serverless applicat
 - `.bandit` - Bandit security scanner configuration (excluded directories)
 - `.github/dependabot.yml` - Dependabot configuration (weekly GitHub Actions version checks)
 - `.github/workflows/dependabot-auto-merge.yml` - Auto-merges Dependabot PRs when CI passes
+- `Makefile` - Common development commands (`make help` to list all targets)
 
 The application uses several AWS resources, including Lambda functions, an API Gateway API, a DynamoDB table, SSM parameters, and AppConfig. These resources are defined in the `hello_world/hello_world_stack.py` file in this project. The Lambda function uses [AWS Lambda Powertools](https://docs.powertools.aws.dev/lambda/python/latest/) extensively — see the [Lambda Powertools features](#lambda-powertools-features) section below for details. Note that Powertools Tracer currently depends on the `aws-xray-sdk`, which is approaching deprecation. There is an [open RFC](https://github.com/aws-powertools/powertools-lambda/discussions/90) to replace it with OpenTelemetry as the tracing provider. You can update the stack to add AWS resources through the same deployment process that updates your application code.
 
@@ -79,6 +80,25 @@ The CDK stack (`hello_world/hello_world_stack.py`) creates the following resourc
 | AppConfig Configuration Profile | `features` profile with `AWS.AppConfig.FeatureFlags` type |
 | Resource Group + Application Insights | CloudWatch Application Insights monitoring |
 | CloudWatch Dashboard | Auto-generated via cdk-monitoring-constructs |
+
+## Makefile
+
+Common commands are available via `make`. Run `make help` to see all targets:
+
+```bash
+make install        # set up venv with all dependencies and pre-commit hooks
+make test           # run unit tests with coverage
+make test-integration  # run integration tests (requires deployed stack)
+make lint           # run all pre-commit hooks (ruff, mypy, pylint, bandit, xenon, pip-audit)
+make format         # format code with ruff
+make typecheck      # run mypy type checking
+make security       # run bandit + pip-audit
+make docs           # build Sphinx HTML docs
+make docs-open      # build and open docs in browser
+make compile        # regenerate all lock files from .in sources
+make upgrade        # upgrade all dependencies to latest compatible versions
+make clean          # remove build artifacts, caches, and coverage files
+```
 
 ## Prerequisites
 
