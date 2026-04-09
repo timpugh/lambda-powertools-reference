@@ -1,7 +1,9 @@
-from typing import Any
+from typing import Any, cast
 
 from aws_cdk import (
     Aspects,
+    CustomResourceProvider,
+    Fn,
     RemovalPolicy,
     Stack,
 )
@@ -126,6 +128,24 @@ class HelloWorldFrontendStack(Stack):
                         sampled_requests_enabled=True,
                     ),
                 ),
+                # Rate limiting — blocks a single IP exceeding 1000 requests per 5 minutes.
+                # Prevents scraping, credential stuffing, and unintentional runaway clients.
+                wafv2.CfnWebACL.RuleProperty(
+                    name="RateLimitPerIP",
+                    priority=3,
+                    action=wafv2.CfnWebACL.RuleActionProperty(block={}),
+                    statement=wafv2.CfnWebACL.StatementProperty(
+                        rate_based_statement=wafv2.CfnWebACL.RateBasedStatementProperty(
+                            limit=1000,
+                            aggregate_key_type="IP",
+                        )
+                    ),
+                    visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
+                        cloud_watch_metrics_enabled=True,
+                        metric_name="RateLimitPerIP",
+                        sampled_requests_enabled=True,
+                    ),
+                ),
             ],
         )
 
@@ -173,6 +193,27 @@ class HelloWorldFrontendStack(Stack):
             distribution_paths=["/*"],
             log_retention=logs.RetentionDays.ONE_WEEK,
         )
+
+        # ── Explicit log group for the CDK auto-delete Lambda ────────────────
+        # CDK creates a singleton Lambda to empty the bucket before deletion.
+        # It is a CloudFormation-managed Lambda, but its log group is created
+        # implicitly by Lambda and has no retention — it would dangle after
+        # cdk destroy. We find the provider via the construct tree and create
+        # an explicit log group so CloudFormation owns and deletes it.
+        auto_delete_provider = cast(
+            CustomResourceProvider,
+            self.node.try_find_child("Custom::S3AutoDeleteObjectsCustomResourceProvider"),
+        )
+        if auto_delete_provider is not None:
+            # service_token is the Lambda ARN; index 6 of the colon-split is the function name
+            fn_name = Fn.select(6, Fn.split(":", auto_delete_provider.service_token))
+            logs.LogGroup(
+                self,
+                "AutoDeleteObjectsLogGroup",
+                log_group_name=Fn.join("", ["/aws/lambda/", fn_name]),
+                retention=logs.RetentionDays.ONE_WEEK,
+                removal_policy=RemovalPolicy.DESTROY,
+            )
 
         # ── cdk-nag suppressions ─────────────────────────────────────────────
         NagSuppressions.add_stack_suppressions(

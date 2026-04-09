@@ -539,6 +539,67 @@ Current suppressions:
 
 Rules that were previously suppressed and have since been implemented are removed from this list. If you add a suppression, include a clear reason and consider whether it belongs in the TODO list as a future improvement.
 
+## Frontend stack
+
+The frontend is a separate CDK stack (`HelloWorldFrontendStack`) that is intentionally decoupled from the backend. This allows the frontend to be deployed and destroyed independently of the API, and follows the standard pattern for CDK multi-stack applications.
+
+### Architecture
+
+```
+Browser → CloudFront → S3 (private bucket)
+               ↓
+             WAF WebACL (inspect every request)
+```
+
+The browser calls `GET /hello` directly from JavaScript against the API Gateway URL — CloudFront only serves static assets, it does not proxy API requests.
+
+### Stacks and deployment
+
+| Stack | Contents | Command |
+|-------|----------|---------|
+| `HelloWorld` | Lambda, API Gateway, DynamoDB, SSM, AppConfig | `cdk deploy HelloWorld` |
+| `HelloWorldFrontend` | S3, CloudFront, WAF | `cdk deploy HelloWorldFrontend` |
+| Both | — | `cdk deploy --all` |
+
+The backend exposes `api_url` as a stack property. The frontend stack consumes it and injects it into `config.json` at deploy time via `BucketDeployment`. The browser fetches `/config.json` at runtime so the API URL is never hardcoded in source.
+
+### S3 bucket
+
+The bucket is fully private — no public access of any kind. CloudFront reaches it exclusively via [Origin Access Control (OAC)](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html), the current AWS-recommended successor to OAI. The bucket is encrypted with SSE-S3, has SSL enforced, versioning disabled (git is the source of truth), and `auto_delete_objects=True` so `cdk destroy` empties and deletes it cleanly.
+
+### CloudFront distribution
+
+| Setting | Value | Why |
+|---------|-------|-----|
+| Viewer protocol | Redirect HTTP → HTTPS | Prevents plaintext traffic |
+| Minimum TLS | TLS 1.2 (2021 policy) | Drops obsolete TLS 1.0/1.1 |
+| Cache policy | `CACHING_OPTIMIZED` | S3 static assets — aggressive caching is correct |
+| Response headers | `SECURITY_HEADERS` managed policy | Adds HSTS, X-Frame-Options, X-Content-Type-Options, etc. |
+| Default root object | `index.html` | Serves the app at `/` |
+| Error responses | 403/404 → `index.html` (200) | Supports SPA client-side routing |
+| Cache invalidation | `/*` on every deploy | New assets served immediately |
+
+### WAF rules
+
+The WebACL sits in front of CloudFront and inspects every request before it reaches S3. Four rules are active, evaluated in priority order:
+
+| Priority | Rule | What it blocks |
+|----------|------|---------------|
+| 0 | `AWSManagedRulesAmazonIpReputationList` | Known malicious IPs — botnets, scanners, TOR exits |
+| 1 | `AWSManagedRulesCommonRuleSet` | OWASP Top 10 web exploits |
+| 2 | `AWSManagedRulesKnownBadInputsRuleSet` | Requests containing SQLi, XSS, and exploit payloads |
+| 3 | `RateLimitPerIP` (custom) | Blocks any single IP exceeding 1,000 requests per 5 minutes |
+
+All rules emit CloudWatch metrics and sampled requests, so WAF activity is visible in the console without additional configuration.
+
+> **WAF requires `us-east-1`** — CloudFront WAF WebACLs must be deployed in `us-east-1` regardless of where your other resources live. This is an AWS service constraint.
+
+### Resource cleanup
+
+Every resource in `HelloWorldFrontendStack` has `RemovalPolicy.DESTROY`, including all CloudWatch log groups. `cdk destroy HelloWorldFrontend` leaves nothing behind.
+
+Note: CDK creates an internal singleton Lambda to empty the S3 bucket before deletion (`Custom::S3AutoDeleteObjects`). Its log group is explicitly declared in the stack so CloudFormation owns it and deletes it on destroy — following the same principle as the API Gateway execution log group in the backend stack.
+
 ## Monitoring
 
 The stack includes a [cdk-monitoring-constructs](https://github.com/cdklabs/cdk-monitoring-constructs) MonitoringFacade that creates a CloudWatch dashboard with Lambda, API Gateway, and DynamoDB metrics out of the box.
