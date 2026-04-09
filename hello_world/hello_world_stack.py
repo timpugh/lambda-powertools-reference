@@ -216,6 +216,17 @@ class HelloWorldStack(Stack):
         hello_resource = api.root.add_resource("hello")
         hello_resource.add_method("GET", apigw.LambdaIntegration(hello_fn))
 
+        # Explicit execution log group — API Gateway creates this outside CloudFormation
+        # when logging_level is enabled. Pre-creating it here transfers ownership to CFN
+        # so it is deleted on cdk destroy. Name format is fixed by the API Gateway service.
+        logs.LogGroup(
+            self,
+            "HelloWorldApiExecutionLogs",
+            log_group_name=f"API-Gateway-Execution-Logs_{api.rest_api_id}/Prod",
+            retention=logs.RetentionDays.ONE_WEEK,
+            removal_policy=RemovalPolicy.DESTROY,
+        )
+
         # Application Insights
         resource_group = rg.CfnGroup(
             self,
