@@ -649,13 +649,19 @@ pip install -r tests/requirements.txt -r lambda/requirements.txt
 
 **Error handling** — the handler demonstrates the recommended pattern for production Lambda error handling. Critical downstream failures (SSM) return a 500 via `InternalServerError` so the API always responds with a meaningful HTTP status rather than a Lambda runtime error. Non-critical failures (AppConfig feature flags) fall back to a safe default rather than failing the whole request. As you extend this project, apply the same pattern to any new downstream calls: decide whether the failure is critical (raise `InternalServerError`) or non-critical (log a warning, use a default), and add a corresponding unit test for each path.
 
+**Explicit resource creation prevents dangling resources** — AWS services sometimes create supporting resources outside of CloudFormation. The most common example is CloudWatch log groups: Lambda creates one automatically on first invocation, and API Gateway creates an execution log group (`API-Gateway-Execution-Logs_{api-id}/{stage}`) whenever execution logging is enabled. Neither is managed by CloudFormation, so neither is deleted when you run `cdk destroy` — they silently persist and accrue storage costs indefinitely.
+
+Every resource in this stack is declared explicitly in CDK with `removal_policy=RemovalPolicy.DESTROY` so that `cdk destroy` leaves nothing behind. When you add new AWS services, check whether they create their own supporting resources (log groups, S3 buckets, parameter store entries, etc.) and declare those explicitly too. The pattern is: if AWS creates it, CDK should own it.
+
 ## Cleanup
 
-To delete the application that you created, run:
+To delete the application and all associated AWS resources, run:
 
 ```bash
 cdk destroy
 ```
+
+Every resource in the stack — including all three CloudWatch log groups — is configured with `RemovalPolicy.DESTROY`, so a single `cdk destroy` leaves no dangling resources and no ongoing AWS costs.
 
 ## Resources
 
