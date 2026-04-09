@@ -10,6 +10,7 @@ import os
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
+from aws_lambda_powertools.event_handler.exceptions import InternalServerError
 from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
 from aws_lambda_powertools.utilities.feature_flags import AppConfigStore, FeatureFlags
@@ -81,13 +82,21 @@ def hello() -> dict:
         request_id=request_id,
     )
 
-    # Fetch greeting from SSM Parameter Store
+    # Fetch greeting from SSM Parameter Store — required, raise 500 on failure
     param_name = os.environ.get("GREETING_PARAM_NAME", "/HelloWorld/greeting")
-    greeting = get_parameter(param_name)
+    try:
+        greeting = get_parameter(param_name)
+    except Exception as exc:
+        logger.exception("Failed to fetch greeting from SSM", param_name=param_name)
+        raise InternalServerError("Failed to fetch greeting") from exc
     logger.info("Greeting fetched from parameter store", greeting=greeting)
 
-    # Check feature flag for enhanced greeting
-    enhanced = feature_flags.evaluate(name="enhanced_greeting", default=False)
+    # Check feature flag — non-critical, fall back to default on failure
+    try:
+        enhanced = feature_flags.evaluate(name="enhanced_greeting", default=False)
+    except Exception:
+        logger.warning("Feature flag evaluation failed, falling back to default")
+        enhanced = False
 
     if enhanced:
         message = f"{greeting} - enhanced mode enabled"

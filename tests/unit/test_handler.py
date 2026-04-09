@@ -2,8 +2,6 @@
 
 import json
 
-import pytest
-
 
 def test_lambda_handler(apigw_event, lambda_context, lambda_app_module):
     ret = lambda_app_module.lambda_handler(apigw_event, lambda_context)
@@ -35,12 +33,12 @@ def test_enhanced_greeting_feature_flag(apigw_event, lambda_context, lambda_app_
     assert "enhanced mode enabled" in data["message"]
 
 
-def test_ssm_failure_propagates_exception(apigw_event, lambda_context, lambda_app_module, mocker):
-    """Test that an SSM parameter fetch failure raises an unhandled exception.
+def test_ssm_failure_returns_500(apigw_event, lambda_context, lambda_app_module, mocker):
+    """Test that an SSM parameter fetch failure returns a 500 response.
 
-    Powertools decorators do not suppress exceptions from route handlers,
-    so a downstream failure propagates to the Lambda runtime, which returns
-    a 502. Production code should add explicit error handling in the handler.
+    The handler catches downstream SSM failures and raises InternalServerError,
+    which Powertools converts to a 500 API Gateway response rather than
+    propagating to the Lambda runtime as an unhandled exception.
     """
     mocker.patch.object(
         lambda_app_module,
@@ -48,8 +46,28 @@ def test_ssm_failure_propagates_exception(apigw_event, lambda_context, lambda_ap
         side_effect=Exception("SSM unavailable"),
     )
 
-    with pytest.raises(Exception, match="SSM unavailable"):
-        lambda_app_module.lambda_handler(apigw_event, lambda_context)
+    ret = lambda_app_module.lambda_handler(apigw_event, lambda_context)
+
+    assert ret["statusCode"] == 500
+
+
+def test_feature_flag_failure_falls_back_to_default(apigw_event, lambda_context, lambda_app_module, mocker):
+    """Test that a feature flag evaluation failure falls back gracefully.
+
+    AppConfig failures are non-critical — the handler logs a warning and
+    uses the default value (False) rather than failing the whole request.
+    """
+    mocker.patch.object(
+        lambda_app_module.feature_flags,
+        "evaluate",
+        side_effect=Exception("AppConfig unavailable"),
+    )
+
+    ret = lambda_app_module.lambda_handler(apigw_event, lambda_context)
+    data = json.loads(ret["body"])
+
+    assert ret["statusCode"] == 200
+    assert data["message"] == "hello world"
 
 
 def test_unknown_route_returns_404(apigw_event, lambda_context, lambda_app_module):

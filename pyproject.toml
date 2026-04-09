@@ -89,6 +89,7 @@ disable = [
     "W0611",  # unused-import (ruff F401 handles this)
     "W0612",  # unused-variable (ruff F841 handles this)
     "W0613",  # unused-argument (unavoidable with some decorator signatures)
+    "W0718",  # broad-exception-caught (intentional for non-critical fallback paths)
 ]
 
 [tool.pylint.format]
