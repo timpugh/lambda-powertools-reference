@@ -2,6 +2,7 @@ from typing import Any
 
 from aws_cdk import (
     Aspects,
+    CfnOutput,
     Stack,
 )
 from aws_cdk import (
@@ -123,3 +124,16 @@ class HelloWorldWafStack(Stack):
         # When the frontend stack is in a different region, CDK bridges this
         # value automatically via SSM (cross_region_references=True on the consumer).
         self.web_acl_arn = web_acl.attr_arn
+
+        CfnOutput(
+            self,
+            "WebAclArn",
+            description="WAF WebACL ARN — attach to CloudFront distributions in any region",
+            value=web_acl.attr_arn,
+        )
+        CfnOutput(
+            self,
+            "WebAclId",
+            description="WAF WebACL logical ID",
+            value=web_acl.attr_id,
+        )

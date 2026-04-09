@@ -2,6 +2,7 @@ from typing import Any, cast
 
 from aws_cdk import (
     Aspects,
+    CfnOutput,
     CustomResourceProvider,
     Fn,
     RemovalPolicy,
@@ -109,6 +110,25 @@ class HelloWorldFrontendStack(Stack):
             distribution=distribution,
             distribution_paths=["/*"],
             log_retention=logs.RetentionDays.ONE_WEEK,
+        )
+
+        CfnOutput(
+            self,
+            "CloudFrontDomainName",
+            description="CloudFront distribution domain name — use this as your frontend URL",
+            value=f"https://{distribution.distribution_domain_name}",
+        )
+        CfnOutput(
+            self,
+            "CloudFrontDistributionId",
+            description="CloudFront distribution ID — needed for manual cache invalidations",
+            value=distribution.distribution_id,
+        )
+        CfnOutput(
+            self,
+            "FrontendBucketName",
+            description="S3 bucket storing the frontend static assets",
+            value=bucket.bucket_name,
         )
 
         # ── Explicit log group for the CDK auto-delete Lambda ────────────────

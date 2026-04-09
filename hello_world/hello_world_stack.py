@@ -288,6 +288,30 @@ class HelloWorldStack(Stack):
             description="IAM Role created for Hello World function",
             value=cast(iam.IRole, hello_fn.role).role_arn,
         )
+        CfnOutput(
+            self,
+            "IdempotencyTableName",
+            description="DynamoDB table used for Lambda idempotency",
+            value=idempotency_table.table_name,
+        )
+        CfnOutput(
+            self,
+            "GreetingParameterName",
+            description="SSM parameter name for the greeting message",
+            value=greeting_param.parameter_name,
+        )
+        CfnOutput(
+            self,
+            "AppConfigAppName",
+            description="AppConfig application name for feature flags",
+            value=app_config_app.name,
+        )
+        CfnOutput(
+            self,
+            "CloudWatchDashboardUrl",
+            description="CloudWatch dashboard URL for this stack",
+            value=f"https://{self.region}.console.aws.amazon.com/cloudwatch/home#dashboards:name={self.stack_name}",
+        )
 
         # Expose API URL for consumption by the frontend stack
         self.api_url = api.url
