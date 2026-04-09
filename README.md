@@ -775,6 +775,18 @@ pip install -r tests/requirements.txt -r lambda/requirements.txt
 
 Every resource in this stack is declared explicitly in CDK with `removal_policy=RemovalPolicy.DESTROY` so that `cdk destroy` leaves nothing behind. When you add new AWS services, check whether they create their own supporting resources (log groups, S3 buckets, parameter store entries, etc.) and declare those explicitly too. The pattern is: if AWS creates it, CDK should own it.
 
+**Application Insights dashboard exception** — Application Insights automatically creates a CloudWatch dashboard named after its resource group when `auto_configuration_enabled=True`. This dashboard is created outside of CloudFormation and cannot be pre-declared in CDK, so it is the one resource that will not be cleaned up by `cdk destroy`. Additionally, if you ever rename the Application Insights resource group (e.g., by changing the stack name), the dashboard associated with the old name will be left behind.
+
+To check for and remove dangling Application Insights dashboards:
+
+```bash
+# List all Application Insights dashboards
+aws cloudwatch list-dashboards --query "DashboardEntries[?contains(DashboardName, 'ApplicationInsights')]"
+
+# Delete a specific dangling dashboard
+aws cloudwatch delete-dashboard --dashboard-names "ApplicationInsights-<old-resource-group-name>"
+```
+
 ## Cleanup
 
 To delete the application and all associated AWS resources, run:
