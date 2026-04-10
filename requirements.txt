@@ -414,9 +414,9 @@ mando==0.7.1 \
     --hash=sha256:18baa999b4b613faefb00eac4efadcf14f510b59b924b66e08289aa1de8c3500 \
     --hash=sha256:26ef1d70928b6057ee3ca12583d73c63e05c49de8972d620c278a7b206581a8a
     # via radon
-markdown-it-py==3.0.0 \
-    --hash=sha256:355216845c60bd96232cd8d8c40e8f9765cc86f46880e43a8fd22dc1a1a8cab1 \
-    --hash=sha256:e3f60a94fa066dc52ec76661e37c851cb232d92f9886b15cb560aaada2df8feb
+markdown-it-py==4.0.0 \
+    --hash=sha256:87327c59b172c5011896038353a81343b6754500a08cd7a4973bb48c6d578147 \
+    --hash=sha256:cb0a2b4aa34f932c007117b194e945bd74e0ec24133ceb5bac59009cda1cb9f3
     # via
     #   mdit-py-plugins
     #   myst-parser
@@ -640,9 +640,9 @@ mypy-extensions==1.1.0 \
     --hash=sha256:1be4cccdb0f2482337c4743e60421de3a356cd97508abadd57d47403e94f5505 \
     --hash=sha256:52e68efc3284861e772bbcd66823fde5ae21fd2fdb51c62a211403730b916558
     # via mypy
-myst-parser==4.0.1 \
-    --hash=sha256:5cfea715e4f3574138aecbf7d54132296bfd72bb614d31168f48c477a830a7c4 \
-    --hash=sha256:9134e88959ec3b5780aedf8a99680ea242869d012e8821db3126d427edc9c95d
+myst-parser==5.0.0 \
+    --hash=sha256:ab31e516024918296e169139072b81592336f2fef55b8986aa31c9f04b5f7211 \
+    --hash=sha256:f6f231452c56e8baa662cc352c548158f6a16fcbd6e3800fc594978002b94f3a
     # via -r requirements.in
 nodeenv==1.10.0 \
     --hash=sha256:5bb13e3eed2923615535339b3c620e76779af4cb4c6a90deccc9e36b274d3827 \

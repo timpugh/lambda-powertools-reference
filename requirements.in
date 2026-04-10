@@ -23,7 +23,7 @@ boto3-stubs==1.42.88
 
 # Documentation
 sphinx==8.2.3
-myst-parser==4.0.1
+myst-parser==5.0.0
 
 # Dependency management
 pip-tools==7.5.3
