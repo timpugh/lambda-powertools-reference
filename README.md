@@ -25,7 +25,7 @@ This project contains source code and supporting files for a serverless applicat
 - `.bandit` - Bandit security scanner configuration (excluded directories)
 - `.vscode/` - VS Code workspace settings and recommended extensions (ruff, mypy, pylint, pytest)
 - `.github/workflows/` - GitHub Actions workflows (`ci.yml`, `docs.yml`, `dependency-audit.yml`, `dependabot-auto-merge.yml`)
-- `.github/dependabot.yml` - Dependabot configuration (weekly GitHub Actions version checks)
+- `.github/dependabot.yml` - Dependabot configuration (weekly checks for GitHub Actions and all three Python requirements tiers)
 - `Makefile` - Common development commands (`make help` to list all targets)
 - `LICENSE` - Apache 2.0 license
 - `TODO.md` - Outstanding work and deferred items
@@ -616,14 +616,59 @@ The `cdk-check` job runs `cdk synth` to catch unsuppressed cdk-nag findings, the
 
 ### Dependabot
 
-Dependabot is configured in `.github/dependabot.yml` to check for GitHub Actions version updates every Monday. When a newer version of an action is available (e.g. `actions/checkout@v4` → a newer release), Dependabot opens a PR automatically.
+Dependabot is configured in `.github/dependabot.yml` to check for updates every Monday across two ecosystems:
 
-The `dependabot-auto-merge` workflow then:
-1. Confirms the PR is a GitHub Actions ecosystem update (not pip)
+| Ecosystem | What it checks | Auto-merge? |
+|-----------|----------------|-------------|
+| `github-actions` | Workflow YAML for newer action versions (e.g. `actions/checkout@v4` → `v5`) | Yes, via `dependabot-auto-merge` workflow once CI passes |
+| `pip` | All three Python requirements tiers (`lambda/`, `tests/`, `/`) — regenerates lock files with hashes in place | No — pip PRs are held for human review |
+
+For GitHub Actions, the `dependabot-auto-merge` workflow:
+1. Confirms the PR is a GitHub Actions ecosystem update
 2. Approves it
 3. Enables auto-merge — GitHub merges it automatically once CI passes
 
-This keeps workflow action versions current without any manual intervention. If CI fails on a Dependabot PR, it stays open for investigation rather than merging.
+If CI fails on a Dependabot PR (any ecosystem), it stays open for investigation rather than merging.
+
+#### Python (`pip`) updates and the pip-tools constraint chain
+
+The three Python requirements tiers are chained together via `pip-compile` constraint files:
+
+```
+lambda/requirements.in  →  lambda/requirements.txt
+                           ↓ (-c constraint)
+tests/requirements.in   →  tests/requirements.txt
+                           ↓ (-c constraint)
+requirements.in         →  requirements.txt
+```
+
+When a package shared across tiers changes version, all downstream lock files must be recompiled in order (lambda → tests → dev). The `make compile` target does this in one step.
+
+**Dependabot handles each directory independently** and does not automatically re-run the downstream compiles. If Dependabot bumps a package in `lambda/requirements.in`, it regenerates `lambda/requirements.txt` correctly — but `tests/requirements.txt` and `requirements.txt` may still reference stale pins from the old lambda file. In practice, this only matters when the bumped package appears in the transitive tree of the downstream tiers.
+
+**The manual fix takes about 30 seconds:**
+
+```bash
+gh pr checkout <PR-number>
+make compile
+git add lambda/requirements.txt tests/requirements.txt requirements.txt
+git commit -m "chore: recompile downstream lock files"
+git push
+```
+
+CI will re-run against the fully-consistent state. We intentionally leave this step manual rather than automating it with a `pull_request_target` workflow: the manual path is ~30 seconds a few times a month, and a `pull_request_target` workflow that pushes back to PR branches carries a non-trivial security surface that is not worth the convenience trade-off for a solo reference project. If this repo ever takes external contributions, the calculus changes and the workflow becomes worth building.
+
+**`attrs` is pinned and ignored.** The `attrs` package has an unresolvable version conflict between CDK (`25.4.0`) and Lambda Powertools (`26.1.0`). Dependabot is configured to ignore `attrs` in all three directories so it does not open unresolvable upgrade PRs — see the "attrs version conflict" note in Design decisions.
+
+#### Why not Renovate?
+
+[Renovate](https://docs.renovatebot.com/) is an alternative to Dependabot that handles multi-file Python setups more gracefully. Specifically:
+
+- Renovate understands `pip-compile` constraint chains natively and recompiles downstream lock files in the correct order automatically — no manual `make compile` step, no bespoke workflow.
+- Renovate supports richer grouping (e.g., "group all AWS packages into one PR") and auto-merge rules scoped by update type (patch/minor/major).
+- Renovate runs as a GitHub App, so it is zero-infrastructure.
+
+This project uses Dependabot rather than Renovate because Dependabot is the GitHub-native default, already integrated into the repo for GitHub Actions updates, and the manual `make compile` step is a minor cost at the current scale. If you extend this pattern to a production repo with more frequent Python churn — or if you want auto-merge for non-major pip updates — Renovate is the lower-friction choice and worth evaluating. The configuration lives in `renovate.json` at the repo root; the GitHub App handles the rest.
 
 ## CDK security checks
 

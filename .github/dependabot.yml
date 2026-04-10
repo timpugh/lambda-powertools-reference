@@ -1,6 +1,7 @@
 version: 2
 
 updates:
+  # GitHub Actions — checks workflow YAML for newer action versions
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -8,3 +9,41 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "America/New_York"
+
+  # Python — Lambda runtime dependencies (lambda/requirements.in → lambda/requirements.txt)
+  # Dependabot auto-detects pip-compile mode from the lock file header and
+  # regenerates the .txt file (with hashes) whenever it bumps a pin in the .in.
+  - package-ecosystem: "pip"
+    directory: "/lambda"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/New_York"
+    ignore:
+      # attrs is pinned at 26.1.0 for Powertools and cannot be upgraded without
+      # breaking CDK (which requires 25.4.0). This is a documented, intentional
+      # conflict — see README "attrs version conflict" section.
+      - dependency-name: "attrs"
+
+  # Python — test dependencies (tests/requirements.in → tests/requirements.txt)
+  - package-ecosystem: "pip"
+    directory: "/tests"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/New_York"
+    ignore:
+      - dependency-name: "attrs"
+
+  # Python — dev/CDK dependencies (requirements.in → requirements.txt)
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/New_York"
+    ignore:
+      - dependency-name: "attrs"
