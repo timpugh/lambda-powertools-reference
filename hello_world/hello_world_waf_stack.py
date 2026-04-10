@@ -3,7 +3,17 @@ from typing import Any
 from aws_cdk import (
     Aspects,
     CfnOutput,
+    RemovalPolicy,
     Stack,
+)
+from aws_cdk import (
+    aws_iam as iam,
+)
+from aws_cdk import (
+    aws_kms as kms,
+)
+from aws_cdk import (
+    aws_logs as logs,
 )
 from aws_cdk import (
     aws_wafv2 as wafv2,
@@ -38,6 +48,36 @@ class HelloWorldWafStack(Stack):
         Aspects.of(self).add(AwsSolutionsChecks(verbose=True))
         Aspects.of(self).add(ServerlessChecks(verbose=True))
         Aspects.of(self).add(NIST80053R5Checks(verbose=True))
+
+        # KMS key for WAF log group encryption.
+        # CloudWatch Logs requires the key policy to grant the Logs service
+        # principal access so it can encrypt log data on write.
+        waf_encryption_key = kms.Key(
+            self,
+            "WafEncryptionKey",
+            description=f"KMS key for {self.stack_name} WAF log group encryption",
+            enable_key_rotation=True,
+            removal_policy=RemovalPolicy.DESTROY,
+        )
+        waf_encryption_key.add_to_resource_policy(
+            iam.PolicyStatement(
+                actions=["kms:Encrypt*", "kms:Decrypt*", "kms:ReEncrypt*", "kms:GenerateDataKey*", "kms:Describe*"],
+                principals=[iam.ServicePrincipal(f"logs.{self.region}.amazonaws.com")],
+                resources=["*"],
+            )
+        )
+
+        # WAF log group — name must start with "aws-waf-logs-" (AWS requirement).
+        # WAFv2 uses its service-linked role (AWSServiceRoleForWAFv2Logging) to
+        # write log events; no additional log group resource policy is needed.
+        waf_log_group = logs.LogGroup(
+            self,
+            "WafLogGroup",
+            log_group_name=f"aws-waf-logs-{self.stack_name}",
+            encryption_key=waf_encryption_key,
+            retention=logs.RetentionDays.ONE_WEEK,
+            removal_policy=RemovalPolicy.DESTROY,
+        )
 
         web_acl = wafv2.CfnWebACL(
             self,
@@ -122,6 +162,14 @@ class HelloWorldWafStack(Stack):
             ],
         )
 
+        # Enable WAF logging to the CloudWatch Logs log group.
+        wafv2.CfnLoggingConfiguration(
+            self,
+            "WAFLogging",
+            log_destination_configs=[waf_log_group.log_group_arn],
+            resource_arn=web_acl.attr_arn,
+        )
+
         # Exposed for HelloWorldFrontendStack to attach to CloudFront.
         # When the frontend stack is in a different region, CDK bridges this
         # value automatically via SSM (cross_region_references=True on the consumer).
@@ -131,8 +179,8 @@ class HelloWorldWafStack(Stack):
             self,
             [
                 {
-                    "id": "NIST.800.53.R5-WAFv2LoggingEnabled",
-                    "reason": "WAF logging requires a Kinesis Data Firehose or S3 destination — not configured for sample app",
+                    "id": "NIST.800.53.R5-IAMNoInlinePolicy",
+                    "reason": "KMS key grants use inline statements — not directly replaceable with managed policies",
                 },
             ],
         )
@@ -148,4 +196,10 @@ class HelloWorldWafStack(Stack):
             "WebAclId",
             description="WAF WebACL logical ID",
             value=web_acl.attr_id,
+        )
+        CfnOutput(
+            self,
+            "WafLogGroupName",
+            description="CloudWatch Logs log group receiving WAF access logs",
+            value=waf_log_group.log_group_name,
         )

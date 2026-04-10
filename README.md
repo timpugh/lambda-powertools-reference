@@ -566,42 +566,42 @@ Full rule documentation: [github.com/cdklabs/cdk-nag/blob/main/RULES.md](https:/
 
 ### Suppressions
 
-Not every rule is appropriate for a sample application. Where a rule has been intentionally suppressed, the suppression lives in the `NagSuppressions.add_stack_suppressions` call at the bottom of each stack file. Each entry includes a `reason` field explaining why it was suppressed rather than fixed.
+Not every rule is appropriate for a sample application. Where a rule has been intentionally suppressed, the suppression lives in the stack file in either `NagSuppressions.add_stack_suppressions` (stack-wide) or `NagSuppressions.add_resource_suppressions`/`add_resource_suppressions_by_path` (targeted to a specific resource). Each entry includes a `reason` field explaining why it was suppressed rather than fixed.
+
+**What is encrypted with CMK:**
+All CloudWatch log groups (Lambda, API Gateway access, API Gateway execution, WAF, auto-delete Lambda), DynamoDB, and the S3 frontend bucket use AWS KMS customer-managed keys with annual key rotation enabled. The S3 access logging bucket uses SSE-S3 because the S3 log delivery service does not support KMS-encrypted target buckets. SSM parameters cannot use CMK (CloudFormation limitation — SecureString is not supported). AppConfig hosted configurations use AWS-managed keys (no CMK option in CDK).
 
 Current suppressions across all stacks:
 
-| Rule | Stack | Why suppressed |
-|------|-------|---------------|
-| `AwsSolutions-APIG2` | Backend | Request validation not needed for sample app |
-| `AwsSolutions-APIG3` | Backend | WAF applied at CloudFront level, not directly on API Gateway |
-| `AwsSolutions-APIG4` | Backend | No authorizer — auth is out of scope for this sample |
-| `AwsSolutions-COG4` | Backend | No Cognito authorizer — same as APIG4 |
-| `AwsSolutions-IAM4` | Backend, Frontend | CDK-managed Lambda roles use AWS managed policies |
-| `AwsSolutions-IAM5` | Backend, Frontend | Wildcard permissions for X-Ray, AppConfig, and CDK custom resources |
-| `AwsSolutions-L1` | Backend, Frontend | Runtime intentionally pinned to Python 3.12; CDK-managed Lambda runtimes |
-| `AwsSolutions-S1` | Frontend | S3 access logging not enabled for sample app |
-| `AwsSolutions-CFR1/3` | Frontend | CloudFront access logging not enabled for sample app |
-| `AwsSolutions-CFR4` | Frontend | Default CloudFront certificate — no custom domain for sample app |
-| `Serverless-LambdaDLQ` | Backend, Frontend | Synchronous invocation via API Gateway; CDK-managed Lambdas |
-| `Serverless-LambdaDefaultMemorySize` | Backend, Frontend | CDK-managed custom resource Lambdas; `HelloWorldFunction` uses explicit 256 MB |
-| `Serverless-LambdaLatestVersion` | Backend, Frontend | Runtime intentionally pinned; CDK-managed Lambda runtimes |
-| `Serverless-LambdaTracing` | Backend, Frontend | CDK-managed custom resource Lambdas do not expose tracing config |
-| `Serverless-APIGWDefaultThrottling` | Backend | Custom throttling not configured for sample app |
-| `CdkNagValidationFailure` | Backend | Intrinsic function reference prevents `Serverless-APIGWStructuredLogging` from validating |
-| `NIST.800.53.R5-LambdaConcurrency` | Backend, Frontend | Concurrency limits not configured for sample app |
-| `NIST.800.53.R5-LambdaDLQ` | Backend, Frontend | Synchronous invocation; CDK-managed Lambdas |
-| `NIST.800.53.R5-LambdaInsideVPC` | Backend, Frontend | No VPC for sample app — adds significant operational complexity |
-| `NIST.800.53.R5-IAMNoInlinePolicy` | Backend, Frontend | CDK-generated inline policies on service roles — not directly configurable |
-| `NIST.800.53.R5-APIGWAssociatedWithWAF` | Backend | WAF applied at CloudFront, not directly on API Gateway |
-| `NIST.800.53.R5-APIGWCacheEnabledAndEncrypted` | Backend | API Gateway caching not enabled for sample app |
-| `NIST.800.53.R5-APIGWSSLEnabled` | Backend | Client-side SSL certificates not required for sample app |
-| `NIST.800.53.R5-CloudWatchLogGroupEncrypted` | Backend, Frontend | KMS log group encryption adds cost not warranted for sample app |
-| `NIST.800.53.R5-DynamoDBInBackupPlan` | Backend | AWS Backup plan not configured; PITR is enabled |
-| `NIST.800.53.R5-S3BucketLoggingEnabled` | Frontend | S3 access logging not enabled for sample app |
-| `NIST.800.53.R5-S3BucketReplicationEnabled` | Frontend | Static assets are redeployable; replication not needed |
-| `NIST.800.53.R5-S3BucketVersioningEnabled` | Frontend | Static assets are redeployable via `cdk deploy`; versioning not needed |
-| `NIST.800.53.R5-S3DefaultEncryptionKMS` | Frontend | SSE-S3 used; KMS not warranted for public static assets |
-| `NIST.800.53.R5-WAFv2LoggingEnabled` | WAF | WAF logging requires Kinesis/S3 destination — not configured for sample app |
+| Rule | Stack | Scope | Why suppressed |
+|------|-------|-------|---------------|
+| `AwsSolutions-APIG2` | Backend | Stack | Request validation not needed for sample app |
+| `AwsSolutions-APIG3` | Backend | Stack | WAF applied at CloudFront, not directly on API Gateway |
+| `AwsSolutions-APIG4` | Backend | Stack | No authorizer — auth is out of scope for this sample |
+| `AwsSolutions-COG4` | Backend | Stack | No Cognito authorizer — same as APIG4 |
+| `AwsSolutions-IAM4` | Backend, Frontend | Stack | CDK-managed Lambda roles use AWS managed policies |
+| `AwsSolutions-IAM5` | Backend, Frontend, WAF | Stack | Wildcard permissions for X-Ray, AppConfig, KMS grants, and CDK custom resources |
+| `AwsSolutions-L1` | Backend, Frontend | Stack | Runtime pinned to Python 3.12; CDK-managed Lambda runtimes |
+| `AwsSolutions-S1` | Frontend | Resource (log bucket) | The access log bucket itself — logging to itself would be circular |
+| `AwsSolutions-CFR1/3` | Frontend | Stack | CloudFront access logging not enabled for sample app |
+| `AwsSolutions-CFR4` | Frontend | Stack | Default CloudFront certificate — no custom domain for sample app |
+| `Serverless-LambdaDLQ` | Backend, Frontend | Stack | Synchronous invocation via API Gateway; CDK-managed Lambdas |
+| `Serverless-LambdaDefaultMemorySize` | Backend, Frontend | Stack | CDK-managed singleton Lambdas; `HelloWorldFunction` uses explicit 256 MB |
+| `Serverless-LambdaLatestVersion` | Backend, Frontend | Stack | Runtime pinned to Python 3.12; CDK-managed runtimes |
+| `Serverless-LambdaTracing` | Backend, Frontend | Per-resource (CDK singletons only) | CDK-managed provider Lambdas do not expose tracing config; `HelloWorldFunction` passes natively |
+| `Serverless-APIGWDefaultThrottling` | Backend | Stack | Custom throttling not configured for sample app |
+| `CdkNagValidationFailure` | Backend | Stack | Intrinsic function reference prevents `Serverless-APIGWStructuredLogging` from validating |
+| `NIST.800.53.R5-LambdaConcurrency` | Backend, Frontend | Stack | Concurrency limits not configured for sample app |
+| `NIST.800.53.R5-LambdaDLQ` | Backend, Frontend | Stack | Synchronous invocation; CDK-managed Lambdas |
+| `NIST.800.53.R5-LambdaInsideVPC` | Backend, Frontend | Stack | No VPC — adds significant operational complexity for sample app |
+| `NIST.800.53.R5-IAMNoInlinePolicy` | Backend, Frontend, WAF | Stack | CDK-generated inline policies on service roles — not directly configurable |
+| `NIST.800.53.R5-APIGWAssociatedWithWAF` | Backend | Stack | WAF applied at CloudFront, not directly on API Gateway |
+| `NIST.800.53.R5-APIGWSSLEnabled` | Backend | Stack | Client-side SSL certificates not required for sample app |
+| `NIST.800.53.R5-DynamoDBInBackupPlan` | Backend | Stack | AWS Backup plan not configured; PITR is enabled for point-in-time recovery |
+| `NIST.800.53.R5-S3BucketLoggingEnabled` | Frontend | Resource (log bucket) | The access log bucket itself — logging to itself would be circular |
+| `NIST.800.53.R5-S3BucketReplicationEnabled` | Frontend | Stack + Resource | Static assets are redeployable; replication not needed |
+| `NIST.800.53.R5-S3BucketVersioningEnabled` | Frontend | Stack + Resource | Static assets are redeployable via `cdk deploy`; versioning not needed |
+| `NIST.800.53.R5-S3DefaultEncryptionKMS` | Frontend | Resource (log bucket only) | S3 log delivery service does not support KMS target buckets; SSE-S3 required |
 
 Rules that were previously suppressed and have since been implemented are removed from this list. If you add a suppression, include a clear `reason` and consider whether the finding represents a genuine gap worth addressing in production.
 

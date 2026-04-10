@@ -99,7 +99,7 @@ max-line-length = 120  # must match [tool.ruff] line-length above
 # Complexity is also enforced via the xenon pre-commit hook.
 [tool.pylint.design]
 max-args = 8         # max parameters per function
-max-locals = 20      # max local variables per function
+max-locals = 25      # max local variables per function (CDK stacks legitimately have many)
 max-returns = 6      # max return statements per function
 max-branches = 12    # max branches (if/for/while/try) per function
 max-statements = 50  # max statements per function body

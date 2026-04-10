@@ -23,6 +23,9 @@ from aws_cdk import (
     aws_iam as iam,
 )
 from aws_cdk import (
+    aws_kms as kms,
+)
+from aws_cdk import (
     aws_lambda as _lambda,
 )
 from aws_cdk import (
@@ -73,6 +76,27 @@ class HelloWorldStack(Stack):
         Aspects.of(self).add(ServerlessChecks(verbose=True))
         Aspects.of(self).add(NIST80053R5Checks(verbose=True))
 
+        # KMS key shared across all CloudWatch log groups and DynamoDB in this stack.
+        # CloudWatch Logs requires the Logs service principal to be granted access
+        # so it can encrypt data on behalf of the service.
+        # Note: SSM StringParameter cannot use CMK — CloudFormation does not support
+        # creating SecureString parameters. AppConfig hosted configs use AWS-managed
+        # keys and do not expose a CMK option via CDK.
+        encryption_key = kms.Key(
+            self,
+            "BackendEncryptionKey",
+            description=f"KMS key for {self.stack_name} log groups and DynamoDB",
+            enable_key_rotation=True,
+            removal_policy=RemovalPolicy.DESTROY,
+        )
+        encryption_key.add_to_resource_policy(
+            iam.PolicyStatement(
+                actions=["kms:Encrypt*", "kms:Decrypt*", "kms:ReEncrypt*", "kms:GenerateDataKey*", "kms:Describe*"],
+                principals=[iam.ServicePrincipal(f"logs.{self.region}.amazonaws.com")],
+                resources=["*"],
+            )
+        )
+
         # DynamoDB table for Powertools idempotency
         idempotency_table = dynamodb.Table(
             self,
@@ -81,6 +105,8 @@ class HelloWorldStack(Stack):
             partition_key=dynamodb.Attribute(name="id", type=dynamodb.AttributeType.STRING),
             time_to_live_attribute="expiration",
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            encryption=dynamodb.TableEncryption.CUSTOMER_MANAGED,
+            encryption_key=encryption_key,
             removal_policy=RemovalPolicy.DESTROY,
             point_in_time_recovery_specification=dynamodb.PointInTimeRecoverySpecification(
                 point_in_time_recovery_enabled=True,
@@ -137,6 +163,7 @@ class HelloWorldStack(Stack):
             self,
             "HelloWorldFunctionLogGroup",
             log_group_name=f"/aws/lambda/{self.stack_name}-HelloWorldFunction",
+            encryption_key=encryption_key,
             retention=logs.RetentionDays.ONE_WEEK,
             removal_policy=RemovalPolicy.DESTROY,
         )
@@ -186,6 +213,7 @@ class HelloWorldStack(Stack):
             self,
             "HelloWorldApiAccessLogs",
             log_group_name=f"/aws/apigateway/{self.stack_name}/access-logs",
+            encryption_key=encryption_key,
             retention=logs.RetentionDays.ONE_WEEK,
             removal_policy=RemovalPolicy.DESTROY,
         )
@@ -202,6 +230,16 @@ class HelloWorldStack(Stack):
             deploy_options=apigw.StageOptions(
                 stage_name="Prod",
                 tracing_enabled=True,
+                # Cache cluster: 0.5 GB — smallest available size (~$0.02/hr, ~$14/month).
+                # Enables caching per NIST.800.53.R5-APIGWCacheEnabledAndEncrypted.
+                cache_cluster_enabled=True,
+                cache_cluster_size="0.5",
+                method_options={
+                    "/*/*": apigw.MethodDeploymentOptions(
+                        caching_enabled=True,
+                        cache_data_encrypted=True,
+                    )
+                },
                 access_log_destination=apigw.LogGroupLogDestination(api_log_group),
                 access_log_format=apigw.AccessLogFormat.json_with_standard_fields(
                     caller=True,
@@ -233,6 +271,7 @@ class HelloWorldStack(Stack):
             self,
             "HelloWorldApiExecutionLogs",
             log_group_name=f"API-Gateway-Execution-Logs_{api.rest_api_id}/Prod",
+            encryption_key=encryption_key,
             retention=logs.RetentionDays.ONE_WEEK,
             removal_policy=RemovalPolicy.DESTROY,
         )
@@ -345,7 +384,33 @@ class HelloWorldStack(Stack):
         # Expose API URL for consumption by the frontend stack
         self.api_url = api.url
 
-        # cdk-nag suppressions for hello-world sample app
+        # ── Per-resource Serverless-LambdaTracing suppressions ───────────────────
+        # HelloWorldFunction already has tracing=ACTIVE and passes the rule natively.
+        # CDK-managed provider Lambdas are singletons created at the stack level —
+        # they are siblings, not children, of the constructs that use them, so
+        # apply_to_children won't reach them. Path-based suppression is used instead.
+        #
+        # AWS679f53fac002430cb0da5b7982bd2287: the AwsCustomResource provider Lambda.
+        #   ID is derived from HANDLER_UUID in CDK source — stable across versions.
+        # LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a: the log retention singleton.
+        #   ID is a hash of "latest" in the CDK LogRetention implementation.
+        _tracing_suppression = [
+            {
+                "id": "Serverless-LambdaTracing",
+                "reason": "CDK-managed singleton Lambda — tracing configuration is not exposed",
+            }
+        ]
+        for _singleton_id in (
+            "AWS679f53fac002430cb0da5b7982bd2287",
+            "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a",
+        ):
+            NagSuppressions.add_resource_suppressions_by_path(
+                self,
+                f"/{self.stack_name}/{_singleton_id}/Resource",
+                _tracing_suppression,
+            )
+
+        # ── Stack-level cdk-nag suppressions ────────────────────────────────────
         NagSuppressions.add_stack_suppressions(
             self,
             [
@@ -378,10 +443,6 @@ class HelloWorldStack(Stack):
                     "reason": "Custom throttling not configured for sample app",
                 },
                 {
-                    "id": "Serverless-LambdaTracing",
-                    "reason": "CDK-managed custom resource Lambdas do not expose tracing configuration",
-                },
-                {
                     "id": "CdkNagValidationFailure",
                     "reason": "Serverless-APIGWStructuredLogging validation fails due to intrinsic function reference in access log destination — structured logging is configured via logging_format=JSON on the Lambda",
                 },
@@ -407,16 +468,8 @@ class HelloWorldStack(Stack):
                     "reason": "WAF not attached to API Gateway for sample app — WAF is applied at CloudFront in the frontend stack",
                 },
                 {
-                    "id": "NIST.800.53.R5-APIGWCacheEnabledAndEncrypted",
-                    "reason": "API Gateway caching not enabled for sample app",
-                },
-                {
                     "id": "NIST.800.53.R5-APIGWSSLEnabled",
                     "reason": "Client-side SSL certificates not required for sample app",
-                },
-                {
-                    "id": "NIST.800.53.R5-CloudWatchLogGroupEncrypted",
-                    "reason": "KMS encryption for CloudWatch log groups adds cost and operational overhead not warranted for sample app",
                 },
                 {
                     "id": "NIST.800.53.R5-DynamoDBInBackupPlan",

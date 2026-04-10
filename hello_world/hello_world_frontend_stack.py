@@ -15,6 +15,9 @@ from aws_cdk import (
     aws_cloudfront_origins as origins,
 )
 from aws_cdk import (
+    aws_kms as kms,
+)
+from aws_cdk import (
     aws_logs as logs,
 )
 from aws_cdk import (
@@ -56,14 +59,69 @@ class HelloWorldFrontendStack(Stack):
         Aspects.of(self).add(ServerlessChecks(verbose=True))
         Aspects.of(self).add(NIST80053R5Checks(verbose=True))
 
+        # ── KMS key ──────────────────────────────────────────────────────────
+        # Used to encrypt the frontend S3 bucket and CloudWatch log group.
+        # CloudWatch Logs requires the Logs service principal in the key policy.
+        frontend_encryption_key = kms.Key(
+            self,
+            "FrontendEncryptionKey",
+            description=f"KMS key for {self.stack_name} S3 bucket and log groups",
+            enable_key_rotation=True,
+            removal_policy=RemovalPolicy.DESTROY,
+        )
+
+        # ── S3 access logging bucket ─────────────────────────────────────────
+        # Receives S3 server access logs from FrontendBucket. Must use SSE-S3
+        # (not SSE-KMS) because the S3 log delivery service does not support
+        # KMS-encrypted target buckets. This bucket itself does not need access
+        # logging (that would be circular), versioning, or replication.
+        access_log_bucket = s3.Bucket(
+            self,
+            "FrontendAccessLogBucket",
+            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
+            encryption=s3.BucketEncryption.S3_MANAGED,
+            enforce_ssl=True,
+            versioned=False,
+            removal_policy=RemovalPolicy.DESTROY,
+            auto_delete_objects=True,
+        )
+        NagSuppressions.add_resource_suppressions(
+            access_log_bucket,
+            [
+                {
+                    "id": "AwsSolutions-S1",
+                    "reason": "This IS the access log bucket — logging to itself would be circular",
+                },
+                {
+                    "id": "NIST.800.53.R5-S3BucketLoggingEnabled",
+                    "reason": "This IS the access log bucket — logging to itself would be circular",
+                },
+                {
+                    "id": "NIST.800.53.R5-S3DefaultEncryptionKMS",
+                    "reason": "S3 log delivery service does not support KMS-encrypted target buckets; SSE-S3 is used instead",
+                },
+                {
+                    "id": "NIST.800.53.R5-S3BucketVersioningEnabled",
+                    "reason": "Versioning not needed for log bucket — logs are append-only and transient",
+                },
+                {
+                    "id": "NIST.800.53.R5-S3BucketReplicationEnabled",
+                    "reason": "Replication not needed for log bucket in sample app",
+                },
+            ],
+        )
+
         # ── S3 bucket ────────────────────────────────────────────────────────
         # Fully private — CloudFront OAC is the only allowed reader.
+        # KMS-encrypted with server access logging to access_log_bucket.
         bucket = s3.Bucket(
             self,
             "FrontendBucket",
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
-            encryption=s3.BucketEncryption.S3_MANAGED,
+            encryption=s3.BucketEncryption.KMS,
+            encryption_key=frontend_encryption_key,
             enforce_ssl=True,
+            server_access_logs_bucket=access_log_bucket,
             versioned=False,
             removal_policy=RemovalPolicy.DESTROY,
             auto_delete_objects=True,
@@ -150,19 +208,43 @@ class HelloWorldFrontendStack(Stack):
                 self,
                 "AutoDeleteObjectsLogGroup",
                 log_group_name=Fn.join("", ["/aws/lambda/", fn_name]),
+                encryption_key=frontend_encryption_key,
                 retention=logs.RetentionDays.ONE_WEEK,
                 removal_policy=RemovalPolicy.DESTROY,
             )
 
-        # ── cdk-nag suppressions ─────────────────────────────────────────────
+        # ── Per-resource Serverless-LambdaTracing suppressions ───────────────────
+        # All Lambdas in this stack are CDK-managed singletons created at the stack
+        # level. They are not children of the user-facing constructs, so path-based
+        # suppression is required.
+        #
+        # Custom::CDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C: the
+        #   BucketDeployment provider Lambda singleton. ID is stable within a CDK
+        #   major version — derived from CDK BucketDeployment source hash.
+        # Custom::S3AutoDeleteObjectsCustomResourceProvider: the auto-delete Lambda.
+        _tracing_suppression = [
+            {
+                "id": "Serverless-LambdaTracing",
+                "reason": "CDK-managed singleton Lambda — tracing configuration is not exposed",
+            }
+        ]
+        NagSuppressions.add_resource_suppressions_by_path(
+            self,
+            f"/{self.stack_name}/Custom::CDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C/Resource",
+            _tracing_suppression,
+        )
+        if auto_delete_provider is not None:
+            NagSuppressions.add_resource_suppressions(
+                auto_delete_provider,
+                _tracing_suppression,
+                apply_to_children=True,
+            )
+
+        # ── Stack-level cdk-nag suppressions ────────────────────────────────────
         NagSuppressions.add_stack_suppressions(
             self,
             [
                 # ── AWS Solutions ────────────────────────────────────────────────
-                {
-                    "id": "AwsSolutions-S1",
-                    "reason": "S3 access logging not enabled for sample app",
-                },
                 {"id": "AwsSolutions-CFR1", "reason": "CloudFront access logging not enabled for sample app"},
                 {"id": "AwsSolutions-CFR3", "reason": "CloudFront access logging not enabled for sample app"},
                 {
@@ -185,10 +267,6 @@ class HelloWorldFrontendStack(Stack):
                     "id": "Serverless-LambdaLatestVersion",
                     "reason": "CDK-managed Lambda runtimes are not directly configurable",
                 },
-                {
-                    "id": "Serverless-LambdaTracing",
-                    "reason": "CDK-managed BucketDeployment and auto-delete Lambdas do not expose tracing configuration",
-                },
                 # ── NIST 800-53 R5 ──────────────────────────────────────────────
                 {
                     "id": "NIST.800.53.R5-LambdaConcurrency",
@@ -207,24 +285,12 @@ class HelloWorldFrontendStack(Stack):
                     "reason": "Inline policies are CDK-generated on BucketDeployment and auto-delete service roles — not directly configurable",
                 },
                 {
-                    "id": "NIST.800.53.R5-S3BucketLoggingEnabled",
-                    "reason": "S3 access logging not enabled for sample app",
-                },
-                {
                     "id": "NIST.800.53.R5-S3BucketReplicationEnabled",
                     "reason": "S3 replication not needed for sample app — static assets are redeployable",
                 },
                 {
                     "id": "NIST.800.53.R5-S3BucketVersioningEnabled",
                     "reason": "S3 versioning not needed for sample app — static assets are redeployable via cdk deploy",
-                },
-                {
-                    "id": "NIST.800.53.R5-S3DefaultEncryptionKMS",
-                    "reason": "SSE-S3 encryption used — KMS not warranted for public static assets in sample app",
-                },
-                {
-                    "id": "NIST.800.53.R5-CloudWatchLogGroupEncrypted",
-                    "reason": "KMS encryption for CloudWatch log groups adds cost and operational overhead not warranted for sample app",
                 },
             ],
         )
