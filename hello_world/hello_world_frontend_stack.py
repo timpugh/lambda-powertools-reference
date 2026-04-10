@@ -15,6 +15,9 @@ from aws_cdk import (
     aws_cloudfront_origins as origins,
 )
 from aws_cdk import (
+    aws_iam as iam,
+)
+from aws_cdk import (
     aws_kms as kms,
 )
 from aws_cdk import (
@@ -70,6 +73,13 @@ class HelloWorldFrontendStack(Stack):
             description=f"KMS key for {self.stack_name} S3 bucket and log groups",
             enable_key_rotation=True,
             removal_policy=RemovalPolicy.DESTROY,
+        )
+        frontend_encryption_key.add_to_resource_policy(
+            iam.PolicyStatement(
+                actions=["kms:Encrypt*", "kms:Decrypt*", "kms:ReEncrypt*", "kms:GenerateDataKey*", "kms:Describe*"],
+                principals=[iam.ServicePrincipal(f"logs.{self.region}.amazonaws.com")],
+                resources=["*"],
+            )
         )
 
         # ── S3 access logging bucket ─────────────────────────────────────────
