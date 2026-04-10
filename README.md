@@ -612,7 +612,7 @@ The CI installs dependencies with `pip-sync` to match the local dev workflow exa
 - `test` job: `pip-sync tests/requirements.txt lambda/requirements.txt`
 - `cdk-check` job: `pip-sync requirements.txt` (CDK) + `pip install pytest pytest-mock` (test runner, added separately to avoid the `attrs` version conflict between CDK and Lambda dependencies) + CDK CLI via `npm install -g aws-cdk`
 
-The `cdk-check` job runs `cdk synth` to catch unsuppressed cdk-nag findings, then runs `tests/unit/test_stacks.py` which uses `aws_cdk.assertions.Template` to verify key security properties of each synthesized stack (KMS encryption, DynamoDB PITR, API Gateway caching, CloudFront TLS version, etc.). Asset bundling (Docker) is skipped via the `aws:cdk:bundling-stacks` context key so the job runs without Docker build time.
+The `cdk-check` job runs `cdk synth` to catch unsuppressed cdk-nag findings, then runs `tests/cdk/test_stacks.py` which uses `aws_cdk.assertions.Template` to verify key security properties of each synthesized stack (KMS encryption, DynamoDB PITR, API Gateway caching, CloudFront TLS version, etc.). These tests live under `tests/cdk/` rather than `tests/unit/` so the unit-test autouse fixture (which mocks Powertools internals) does not apply — the cdk-check job intentionally does not install Powertools to avoid the `attrs` version conflict. Asset bundling (Docker) is skipped via the `aws:cdk:bundling-stacks` context key so the job runs without Docker build time.
 
 ### Dependabot
 

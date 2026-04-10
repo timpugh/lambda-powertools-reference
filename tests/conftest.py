@@ -1,16 +1,17 @@
 """Shared test fixtures for the Hello World project."""
 
+import importlib.util
 import os
 import sys
 
 import pytest
 
-# Add the lambda directory to the FRONT of the path so it takes priority
-# over the root app.py (CDK entry point)
-LAMBDA_DIR = os.path.join(os.path.dirname(__file__), "..", "lambda")
-sys.path.insert(0, os.path.abspath(LAMBDA_DIR))
-
-import app as lambda_app  # noqa: E402
+# Path to the Lambda handler module. We load it by absolute file path inside
+# the lambda_app_module fixture rather than relying on sys.path, because
+# pytest re-prepends the project rootdir to sys.path after conftest.py runs,
+# which would shadow lambda/app.py with the root-level CDK entry point app.py.
+# Loading by file path is unambiguous and avoids that collision entirely.
+LAMBDA_APP_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "lambda", "app.py"))
 
 
 @pytest.fixture
@@ -58,5 +59,18 @@ def lambda_context(mocker):
 
 @pytest.fixture
 def lambda_app_module():
-    """Provide the Lambda app module for direct access in tests."""
-    return lambda_app
+    """Provide the Lambda app module for direct access in tests.
+
+    Loaded lazily by absolute file path so test environments without
+    aws_lambda_powertools installed (e.g. the cdk-check CI job) can still
+    collect tests that don't depend on this fixture without an ImportError
+    at conftest load time. Cached in sys.modules under "lambda_app" so that
+    mocker.patch.object() sees a consistent module identity across fixtures.
+    """
+    if "lambda_app" in sys.modules:
+        return sys.modules["lambda_app"]
+    spec = importlib.util.spec_from_file_location("lambda_app", LAMBDA_APP_PATH)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["lambda_app"] = module
+    spec.loader.exec_module(module)
+    return module

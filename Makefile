@@ -31,7 +31,7 @@ test: ## Run unit tests with coverage
 	$(PYTHON) -m pytest tests/unit -v
 
 test-cdk: ## Run CDK stack assertion tests (requires aws_cdk — use make install, not make install-dev)
-	$(PYTHON) -m pytest tests/unit/test_stacks.py -v --override-ini="addopts=" --timeout=120
+	$(PYTHON) -m pytest tests/cdk -v --override-ini="addopts=" --timeout=120
 
 test-integration: ## Run integration tests (requires deployed stack)
 	$(PYTHON) -m pytest tests/integration -v

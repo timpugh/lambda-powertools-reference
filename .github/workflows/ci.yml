@@ -93,4 +93,4 @@ jobs:
       - name: Run CDK stack assertion tests
         env:
           AWS_DEFAULT_REGION: us-east-1
-        run: python -m pytest tests/unit/test_stacks.py -v --override-ini="addopts=" --timeout=120
+        run: python -m pytest tests/cdk -v --override-ini="addopts=" --timeout=120

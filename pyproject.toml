@@ -54,7 +54,7 @@ known-third-party = ["aws_lambda_powertools", "boto3"]
 # S101: assert statements — valid in pytest; S106: hardcoded password — false positive on fixtures
 "tests/**/*.py" = ["S101", "S106"]
 # E402: imports follow pytest.importorskip() which must come first to skip the module when aws_cdk is absent
-"tests/unit/test_stacks.py" = ["E402"]
+"tests/cdk/test_stacks.py" = ["E402"]
 
 # =============================================================================
 # Mypy — static type checker
