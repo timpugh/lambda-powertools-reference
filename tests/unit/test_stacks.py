@@ -24,12 +24,12 @@ import pytest
 
 aws_cdk = pytest.importorskip("aws_cdk", reason="aws_cdk not installed — skipping CDK stack tests")
 
-import aws_cdk as cdk  # noqa: E402
-from aws_cdk.assertions import Match, Template  # noqa: E402
+import aws_cdk as cdk
+from aws_cdk.assertions import Match, Template
 
-from hello_world.hello_world_frontend_stack import HelloWorldFrontendStack  # noqa: E402
-from hello_world.hello_world_stack import HelloWorldStack  # noqa: E402
-from hello_world.hello_world_waf_stack import HelloWorldWafStack  # noqa: E402
+from hello_world.hello_world_frontend_stack import HelloWorldFrontendStack
+from hello_world.hello_world_stack import HelloWorldStack
+from hello_world.hello_world_waf_stack import HelloWorldWafStack
 
 # Fake account/region — synthesis does not make live AWS API calls
 _TEST_ACCOUNT = "123456789012"
