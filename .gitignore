@@ -231,3 +231,6 @@ report.html
 
 # Ruff cache
 .ruff_cache/
+
+# Claude Code local memory
+.claude/
