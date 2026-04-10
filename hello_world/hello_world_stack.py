@@ -45,6 +45,8 @@ from cdk_monitoring_constructs import DefaultDashboardFactory, MonitoringFacade
 from cdk_nag import AwsSolutionsChecks, NagSuppressions, NIST80053R5Checks, ServerlessChecks
 from constructs import Construct
 
+from hello_world.nag_utils import CDK_LAMBDA_SUPPRESSIONS
+
 
 class HelloWorldStack(Stack):
     """Main CDK stack for the Hello World serverless application.
@@ -384,88 +386,126 @@ class HelloWorldStack(Stack):
         # Expose API URL for consumption by the frontend stack
         self.api_url = api.url
 
-        # ── Per-resource Serverless-LambdaTracing suppressions ───────────────────
-        # HelloWorldFunction already has tracing=ACTIVE and passes the rule natively.
-        # CDK-managed provider Lambdas are singletons created at the stack level —
-        # they are siblings, not children, of the constructs that use them, so
-        # apply_to_children won't reach them. Path-based suppression is used instead.
+        # ── Per-resource cdk-nag suppressions ──────────────────────────────────
+        # CDK-managed singleton Lambdas are created at the stack level as siblings,
+        # not children, of the constructs that request them. Path-based suppression
+        # is the only way to target them precisely.
         #
-        # AWS679f53fac002430cb0da5b7982bd2287: the AwsCustomResource provider Lambda.
-        #   ID is derived from HANDLER_UUID in CDK source — stable across versions.
-        # LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a: the log retention singleton.
-        #   ID is a hash of "latest" in the CDK LogRetention implementation.
-        _tracing_suppression = [
-            {
-                "id": "Serverless-LambdaTracing",
-                "reason": "CDK-managed singleton Lambda — tracing configuration is not exposed",
-            }
-        ]
+        # Stable singleton IDs (derived from CDK source hashes — do not change):
+        #   AWS679f53fac002430cb0da5b7982bd2287  — AwsCustomResource provider Lambda
+        #   LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a — log retention singleton
+        #
+        # HelloWorldFunction passes Lambda rules natively (tracing=ACTIVE,
+        # memory_size=256, sync invocation). Only CDK-managed Lambdas are suppressed.
+
+        # Suppress on HelloWorldFunction — intentional design decisions, not CDK limitations
+        NagSuppressions.add_resource_suppressions(
+            hello_fn,
+            [
+                {"id": "AwsSolutions-L1", "reason": "Runtime intentionally pinned to Python 3.12"},
+                {"id": "Serverless-LambdaLatestVersion", "reason": "Runtime intentionally pinned to Python 3.12"},
+                {
+                    "id": "Serverless-LambdaDLQ",
+                    "reason": "Invoked synchronously via API Gateway — async DLQ pattern does not apply",
+                },
+                {
+                    "id": "NIST.800.53.R5-LambdaDLQ",
+                    "reason": "Invoked synchronously via API Gateway — async DLQ pattern does not apply",
+                },
+                {
+                    "id": "NIST.800.53.R5-LambdaConcurrency",
+                    "reason": "Concurrency limits not configured for sample app",
+                },
+                {"id": "NIST.800.53.R5-LambdaInsideVPC", "reason": "No VPC — adds significant operational complexity"},
+                # Service role uses AWSLambdaBasicExecutionRole managed policy
+                {
+                    "id": "AwsSolutions-IAM4",
+                    "reason": "AWSLambdaBasicExecutionRole is the minimal managed policy for Lambda execution",
+                    "applies_to": [
+                        "Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+                    ],
+                },
+                # Default policy has KMS wildcard actions (required for CMK use) and
+                # Resource::* for X-Ray and AppConfig (no resource-level ARNs available)
+                {
+                    "id": "AwsSolutions-IAM5",
+                    "reason": "kms:GenerateDataKey* and kms:ReEncrypt* require wildcard action suffix — standard KMS usage pattern",
+                    "applies_to": ["Action::kms:GenerateDataKey*", "Action::kms:ReEncrypt*"],
+                },
+                {
+                    "id": "AwsSolutions-IAM5",
+                    "reason": "X-Ray and AppConfig do not support resource-level ARNs in IAM — wildcard is required",
+                    "applies_to": ["Resource::*"],
+                },
+                {
+                    "id": "NIST.800.53.R5-IAMNoInlinePolicy",
+                    "reason": "CDK generates the default policy inline on the Lambda service role — not directly configurable",
+                },
+            ],
+            apply_to_children=True,  # covers service role and default policy
+        )
+
+        # Suppress on AwsCustomResource provider (AppInsights dashboard cleanup)
+        # and log retention singleton — CDK limitations, not configurable
         for _singleton_id in (
             "AWS679f53fac002430cb0da5b7982bd2287",
             "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a",
         ):
             NagSuppressions.add_resource_suppressions_by_path(
                 self,
-                f"/{self.stack_name}/{_singleton_id}/Resource",
-                _tracing_suppression,
+                f"/{self.stack_name}/{_singleton_id}",
+                CDK_LAMBDA_SUPPRESSIONS,
+                apply_to_children=True,
             )
 
-        # ── Stack-level cdk-nag suppressions ────────────────────────────────────
+        # AppInsights cleanup custom resource policy (IAM5 / IAMNoInlinePolicy)
+        NagSuppressions.add_resource_suppressions(
+            app_insights_dashboard_cleanup,
+            [
+                {
+                    "id": "AwsSolutions-IAM5",
+                    "reason": "AwsCustomResource policy uses wildcard — required to call CloudWatch DeleteDashboards",
+                },
+                {
+                    "id": "NIST.800.53.R5-IAMNoInlinePolicy",
+                    "reason": "AwsCustomResource generates an inline policy — not directly configurable",
+                },
+            ],
+            apply_to_children=True,
+        )
+
+        # API Gateway CloudWatch role — CDK-managed, uses managed policy
+        NagSuppressions.add_resource_suppressions_by_path(
+            self,
+            f"/{self.stack_name}/HelloWorldApi/CloudWatchRole/Resource",
+            [{"id": "AwsSolutions-IAM4", "reason": "CDK-managed API Gateway CloudWatch role uses AWS managed policy"}],
+        )
+
+        # ── Stack-level cdk-nag suppressions (genuinely stack-wide) ─────────────
         NagSuppressions.add_stack_suppressions(
             self,
             [
                 # ── AWS Solutions ────────────────────────────────────────────────
                 {"id": "AwsSolutions-APIG2", "reason": "Request validation not needed for sample app"},
-                {"id": "AwsSolutions-APIG3", "reason": "WAF not attached to API Gateway for sample app"},
+                {
+                    "id": "AwsSolutions-APIG3",
+                    "reason": "WAF not attached to API Gateway — applied at CloudFront instead",
+                },
                 {"id": "AwsSolutions-APIG4", "reason": "Authorization not needed for sample app"},
                 {"id": "AwsSolutions-COG4", "reason": "Cognito authorizer not needed for sample app"},
-                {"id": "AwsSolutions-IAM4", "reason": "Managed policies acceptable for sample app"},
-                {
-                    "id": "AwsSolutions-IAM5",
-                    "reason": "Wildcard permissions for X-Ray, AppConfig, and CloudWatch dashboard cleanup custom resource",
-                },
-                {"id": "AwsSolutions-L1", "reason": "Runtime version is intentionally pinned to Python 3.12"},
                 # ── Serverless ───────────────────────────────────────────────────
-                {
-                    "id": "Serverless-LambdaDLQ",
-                    "reason": "Lambda is invoked synchronously via API Gateway — async DLQ pattern does not apply",
-                },
-                {
-                    "id": "Serverless-LambdaDefaultMemorySize",
-                    "reason": "CDK-managed custom resource Lambdas do not expose memory configuration",
-                },
-                {
-                    "id": "Serverless-LambdaLatestVersion",
-                    "reason": "Runtime version is intentionally pinned to Python 3.12",
-                },
                 {
                     "id": "Serverless-APIGWDefaultThrottling",
                     "reason": "Custom throttling not configured for sample app",
                 },
                 {
                     "id": "CdkNagValidationFailure",
-                    "reason": "Serverless-APIGWStructuredLogging validation fails due to intrinsic function reference in access log destination — structured logging is configured via logging_format=JSON on the Lambda",
+                    "reason": "Serverless-APIGWStructuredLogging validation fails due to intrinsic function reference in access log destination — structured JSON logging is configured via logging_format=JSON on the Lambda",
                 },
                 # ── NIST 800-53 R5 ──────────────────────────────────────────────
                 {
-                    "id": "NIST.800.53.R5-LambdaConcurrency",
-                    "reason": "Concurrency limits not configured for sample app",
-                },
-                {
-                    "id": "NIST.800.53.R5-LambdaDLQ",
-                    "reason": "Lambda is invoked synchronously via API Gateway — async DLQ pattern does not apply",
-                },
-                {
-                    "id": "NIST.800.53.R5-LambdaInsideVPC",
-                    "reason": "No VPC for sample app — VPC adds significant operational complexity",
-                },
-                {
-                    "id": "NIST.800.53.R5-IAMNoInlinePolicy",
-                    "reason": "Inline policies are CDK-generated on Lambda service roles and custom resource providers — not directly configurable",
-                },
-                {
                     "id": "NIST.800.53.R5-APIGWAssociatedWithWAF",
-                    "reason": "WAF not attached to API Gateway for sample app — WAF is applied at CloudFront in the frontend stack",
+                    "reason": "WAF not attached to API Gateway — applied at CloudFront instead",
                 },
                 {
                     "id": "NIST.800.53.R5-APIGWSSLEnabled",

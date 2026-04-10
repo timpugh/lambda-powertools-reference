@@ -29,6 +29,8 @@ from aws_cdk import (
 from cdk_nag import AwsSolutionsChecks, NagSuppressions, NIST80053R5Checks, ServerlessChecks
 from constructs import Construct
 
+from hello_world.nag_utils import CDK_LAMBDA_SUPPRESSIONS
+
 
 class HelloWorldFrontendStack(Stack):
     """CDK stack for the Hello World frontend.
@@ -213,34 +215,37 @@ class HelloWorldFrontendStack(Stack):
                 removal_policy=RemovalPolicy.DESTROY,
             )
 
-        # ── Per-resource Serverless-LambdaTracing suppressions ───────────────────
-        # All Lambdas in this stack are CDK-managed singletons created at the stack
-        # level. They are not children of the user-facing constructs, so path-based
-        # suppression is required.
+        # ── Per-resource cdk-nag suppressions ──────────────────────────────────
+        # All Lambdas in this stack are CDK-managed singletons. They are stack-level
+        # siblings, not children of user-facing constructs, so path-based suppression
+        # is required. The access log bucket is suppressed separately because its
+        # reason differs from the frontend bucket.
         #
-        # Custom::CDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C: the
-        #   BucketDeployment provider Lambda singleton. ID is stable within a CDK
-        #   major version — derived from CDK BucketDeployment source hash.
-        # Custom::S3AutoDeleteObjectsCustomResourceProvider: the auto-delete Lambda.
-        _tracing_suppression = [
-            {
-                "id": "Serverless-LambdaTracing",
-                "reason": "CDK-managed singleton Lambda — tracing configuration is not exposed",
-            }
-        ]
+        # Stable singleton IDs:
+        #   Custom::CDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C — BucketDeployment provider
+        #   Custom::S3AutoDeleteObjectsCustomResourceProvider — auto-delete provider
+        #   LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a — log retention singleton
+
         NagSuppressions.add_resource_suppressions_by_path(
             self,
-            f"/{self.stack_name}/Custom::CDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C/Resource",
-            _tracing_suppression,
+            f"/{self.stack_name}/Custom::CDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C",
+            CDK_LAMBDA_SUPPRESSIONS,
+            apply_to_children=True,
+        )
+        NagSuppressions.add_resource_suppressions_by_path(
+            self,
+            f"/{self.stack_name}/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a",
+            CDK_LAMBDA_SUPPRESSIONS,
+            apply_to_children=True,
         )
         if auto_delete_provider is not None:
             NagSuppressions.add_resource_suppressions(
                 auto_delete_provider,
-                _tracing_suppression,
+                CDK_LAMBDA_SUPPRESSIONS,
                 apply_to_children=True,
             )
 
-        # ── Stack-level cdk-nag suppressions ────────────────────────────────────
+        # ── Stack-level cdk-nag suppressions (genuinely stack-wide) ─────────────
         NagSuppressions.add_stack_suppressions(
             self,
             [
@@ -251,39 +256,7 @@ class HelloWorldFrontendStack(Stack):
                     "id": "AwsSolutions-CFR4",
                     "reason": "Using default CloudFront certificate — no custom domain for sample app",
                 },
-                {"id": "AwsSolutions-IAM4", "reason": "BucketDeployment custom resource uses CDK-managed policies"},
-                {"id": "AwsSolutions-IAM5", "reason": "BucketDeployment requires wildcard on destination bucket"},
-                {"id": "AwsSolutions-L1", "reason": "BucketDeployment and auto-delete Lambda runtimes are CDK-managed"},
-                # ── Serverless ───────────────────────────────────────────────────
-                {
-                    "id": "Serverless-LambdaDLQ",
-                    "reason": "CDK-managed BucketDeployment and auto-delete Lambdas do not expose DLQ configuration",
-                },
-                {
-                    "id": "Serverless-LambdaDefaultMemorySize",
-                    "reason": "CDK-managed BucketDeployment and auto-delete Lambdas do not expose memory configuration",
-                },
-                {
-                    "id": "Serverless-LambdaLatestVersion",
-                    "reason": "CDK-managed Lambda runtimes are not directly configurable",
-                },
                 # ── NIST 800-53 R5 ──────────────────────────────────────────────
-                {
-                    "id": "NIST.800.53.R5-LambdaConcurrency",
-                    "reason": "CDK-managed Lambdas do not expose concurrency configuration",
-                },
-                {
-                    "id": "NIST.800.53.R5-LambdaDLQ",
-                    "reason": "CDK-managed BucketDeployment and auto-delete Lambdas do not expose DLQ configuration",
-                },
-                {
-                    "id": "NIST.800.53.R5-LambdaInsideVPC",
-                    "reason": "No VPC for sample app — CDK-managed Lambdas also do not expose VPC configuration",
-                },
-                {
-                    "id": "NIST.800.53.R5-IAMNoInlinePolicy",
-                    "reason": "Inline policies are CDK-generated on BucketDeployment and auto-delete service roles — not directly configurable",
-                },
                 {
                     "id": "NIST.800.53.R5-S3BucketReplicationEnabled",
                     "reason": "S3 replication not needed for sample app — static assets are redeployable",
