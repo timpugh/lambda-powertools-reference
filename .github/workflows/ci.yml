@@ -78,7 +78,7 @@ jobs:
         run: pip-sync requirements.txt
 
       - name: Install pytest (separate from pip-sync to avoid attrs conflict)
-        run: pip install pytest pytest-mock
+        run: pip install pytest pytest-mock pytest-timeout
 
       - name: Install CDK CLI
         run: npm install -g aws-cdk
