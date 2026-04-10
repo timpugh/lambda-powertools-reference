@@ -529,6 +529,22 @@ Security is enforced at three layers, each covering a different surface area:
 
 These tools are complementary — no single one covers all three surfaces. Bandit catches code-level issues, pip-audit catches supply chain issues, and cdk-nag catches infrastructure misconfigurations.
 
+## Detecting deprecated APIs
+
+Deprecated APIs are easy to ignore because they keep working — until the next major release removes them. There is no single command that catches every kind of deprecation, so this project uses a combination of approaches. Each one targets a different layer:
+
+| # | Approach | Catches | How to run |
+|---|----------|---------|------------|
+| 1 | **CDK API deprecations** | Deprecated CDK properties or methods used by any stack (e.g. `FunctionOptions#logRetention` → `logGroup`) | `make cdk-deprecations` (greps `cdk synth` output for `deprecated`) |
+| 2 | **`cdk notices`** | AWS-published advisories about the CDK toolchain itself — CVEs, deprecated CDK versions, upcoming breaking changes | `make cdk-notices` |
+| 3 | **Python `DeprecationWarning` in tests** | Deprecated stdlib or third-party API calls hit by your tests (boto3, Powertools, etc.) | Temporarily add `filterwarnings = ["error::DeprecationWarning"]` to `[tool.pytest.ini_options]` in `pyproject.toml`, run `pytest`, then revert. Useful as a one-shot audit but too noisy to leave on permanently. |
+| 4 | **Ruff `UP` (pyupgrade)** | Deprecated Python syntax — e.g. `typing.List` → `list`, `Optional[X]` → `X \| None` | Already enabled in `[tool.ruff.lint]` `select`. Runs on every `make lint` and on every commit via the pre-commit hook. |
+| 5 | **`pip list --outdated`** | Version drift — packages that are multiple major versions behind are likely calling deprecated APIs | `pip list --outdated` |
+
+The first two are CDK-specific, the next two are Python-specific, and the last one is a general health check across all dependencies. None of them are mutually exclusive.
+
+`cdk synth` no longer passes `--no-notices` (it used to, to keep CI output clean), so notices and CDK API deprecation warnings now print on every synth in both local and CI runs.
+
 ## Commit message convention
 
 This project follows [Conventional Commits](https://www.conventionalcommits.org/). Format:

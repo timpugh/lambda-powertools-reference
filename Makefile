@@ -3,7 +3,7 @@ PYTHON := python3
 VENV := .venv
 PIP := pip
 
-.PHONY: help install install-dev test test-cdk test-integration lint format typecheck security cdk-synth docs docs-open compile upgrade clean
+.PHONY: help install install-dev test test-cdk test-integration lint format typecheck security cdk-synth cdk-notices cdk-deprecations docs docs-open compile upgrade clean
 
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -41,7 +41,13 @@ test-integration: ## Run integration tests (requires deployed stack)
 # =============================================================================
 
 cdk-synth: ## Synthesize all CDK stacks and validate cdk-nag rules (requires CDK CLI: npm install -g aws-cdk)
-	cdk synth --no-notices
+	cdk synth
+
+cdk-notices: ## Show AWS-published CDK notices (CVEs, deprecated CDK versions, upcoming breaking changes)
+	cdk notices
+
+cdk-deprecations: ## List every deprecated CDK API used by any stack (synth output filtered for "deprecated")
+	cdk synth 2>&1 | grep -i deprecat || echo "No deprecated CDK APIs in use"
 
 lint: ## Run all pre-commit hooks (ruff, mypy, pylint, bandit, xenon, pip-audit)
 	pre-commit run --all-files
