@@ -19,7 +19,7 @@ pip-audit==2.10.0
 pre-commit==4.5.1
 
 # Type stubs
-boto3-stubs==1.42.83
+boto3-stubs==1.42.88
 
 # Documentation
 sphinx==8.2.3
