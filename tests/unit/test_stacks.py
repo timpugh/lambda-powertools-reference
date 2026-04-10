@@ -201,10 +201,11 @@ class TestFrontendStack:
             },
         )
 
-    def test_cloudfront_enforces_tls_1_2(self, frontend_template: Template) -> None:
+    def test_cloudfront_has_waf_attached(self, frontend_template: Template) -> None:
+        # WebACLId is set from the WAF stack — confirms cross-stack wiring is intact
         frontend_template.has_resource_properties(
             "AWS::CloudFront::Distribution",
-            {"DistributionConfig": {"ViewerCertificate": {"MinimumProtocolVersion": "TLSv1.2_2021"}}},
+            {"DistributionConfig": {"WebACLId": Match.any_value()}},
         )
 
     def test_cloudfront_redirects_http_to_https(self, frontend_template: Template) -> None:

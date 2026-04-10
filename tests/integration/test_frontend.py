@@ -40,7 +40,7 @@ class TestFrontend:
         except Exception:
             pytest.skip(f"Stack '{stack_name}' not found — skipping frontend integration tests")
 
-        outputs = response["Stacks"][0]["Outputs"]
+        outputs = response["Stacks"][0].get("Outputs", [])
         url_outputs = [o for o in outputs if o["OutputKey"] == "CloudFrontDomainName"]
 
         if not url_outputs:
