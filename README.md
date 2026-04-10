@@ -457,7 +457,7 @@ Security is enforced at three layers, each covering a different surface area:
 |---|---|---|---|
 | **Source code** | bandit | `lambda/` and `hello_world/` for security anti-patterns (hardcoded secrets, shell injection, unsafe deserialization, etc.) | Pre-commit hook on every commit; CI quality job |
 | **Dependencies** | pip-audit | All three requirements files for packages with known CVEs | Pre-commit hook on every commit; weekly Dependency Audit workflow |
-| **Infrastructure** | cdk-nag | CDK stack against AWS Solutions security rules | `cdk synth` — findings are printed and fail synthesis if unsuppressed |
+| **Infrastructure** | cdk-nag | CDK stacks against AWS Solutions, Serverless, and NIST 800-53 R5 rules | `cdk synth` — findings are printed and fail synthesis if unsuppressed |
 
 These tools are complementary — no single one covers all three surfaces. Bandit catches code-level issues, pip-audit catches supply chain issues, and cdk-nag catches infrastructure misconfigurations.
 
@@ -540,27 +540,70 @@ This keeps workflow action versions current without any manual intervention. If 
 
 ## CDK security checks
 
-The CDK stack uses [cdk-nag](https://github.com/cdklabs/cdk-nag) with the [AWS Solutions rule pack](https://github.com/cdklabs/cdk-nag/blob/main/RULES.md#awssolutions) applied to every resource at synth time. Any finding that is not suppressed fails `cdk synth` — this means infrastructure misconfigurations are caught before deployment, not after.
+All three stacks use [cdk-nag](https://github.com/cdklabs/cdk-nag) with three rule packs applied to every resource at synth time. Any finding that is not suppressed fails `cdk synth` — infrastructure misconfigurations are caught before deployment, not after.
 
 Checks run automatically on every `cdk synth` and `cdk deploy`. There is no separate command needed.
 
+### Rule packs in use
+
+| Pack | Import | Focus |
+|------|--------|-------|
+| `AwsSolutionsChecks` | `from cdk_nag import AwsSolutionsChecks` | AWS general best practices — IAM, encryption, logging, resilience |
+| `ServerlessChecks` | `from cdk_nag import ServerlessChecks` | Serverless-specific rules — Lambda DLQ, tracing, memory, throttling |
+| `NIST80053R5Checks` | `from cdk_nag import NIST80053R5Checks` | NIST 800-53 Rev 5 controls — the current standard used by many enterprises and federal workloads |
+
+### Other available rule packs
+
+cdk-nag ships additional packs that are not enabled in this project. They can be added by importing and applying them the same way as the packs above:
+
+| Pack | Import | When to use |
+|------|--------|-------------|
+| `NIST80053R4Checks` | `from cdk_nag import NIST80053R4Checks` | NIST 800-53 Rev 4 — superseded by R5; only use if your compliance framework specifically requires R4 |
+| `HIPAASecurityChecks` | `from cdk_nag import HIPAASecurityChecks` | HIPAA Security Rule — required when handling protected health information (PHI) |
+| `PCIDSS321Checks` | `from cdk_nag import PCIDSS321Checks` | PCI DSS 3.2.1 — required when handling payment card data |
+
+Full rule documentation: [github.com/cdklabs/cdk-nag/blob/main/RULES.md](https://github.com/cdklabs/cdk-nag/blob/main/RULES.md)
+
 ### Suppressions
 
-Not every rule is appropriate for a sample application. Where a rule has been intentionally suppressed, the suppression lives at the bottom of `hello_world/hello_world_stack.py` in the `NagSuppressions.add_stack_suppressions` call. Each entry includes a `reason` field explaining why it was suppressed rather than fixed.
+Not every rule is appropriate for a sample application. Where a rule has been intentionally suppressed, the suppression lives in the `NagSuppressions.add_stack_suppressions` call at the bottom of each stack file. Each entry includes a `reason` field explaining why it was suppressed rather than fixed.
 
-Current suppressions:
+Current suppressions across all stacks:
 
-| Rule | Why suppressed |
-|------|---------------|
-| `AwsSolutions-APIG2` | Request validation model not added for this sample |
-| `AwsSolutions-APIG3` | WAF not attached — cost/complexity not warranted for a sample |
-| `AwsSolutions-APIG4` | No API authorizer — intentional, auth is a TODO item |
-| `AwsSolutions-COG4` | No Cognito authorizer — same as APIG4 |
-| `AwsSolutions-IAM4` | Lambda uses `AWSLambdaBasicExecutionRole` managed policy |
-| `AwsSolutions-IAM5` | AppConfig requires wildcard resource in its IAM policy |
-| `AwsSolutions-L1` | Python 3.12 runtime intentionally pinned rather than using LATEST |
+| Rule | Stack | Why suppressed |
+|------|-------|---------------|
+| `AwsSolutions-APIG2` | Backend | Request validation not needed for sample app |
+| `AwsSolutions-APIG3` | Backend | WAF applied at CloudFront level, not directly on API Gateway |
+| `AwsSolutions-APIG4` | Backend | No authorizer — auth is out of scope for this sample |
+| `AwsSolutions-COG4` | Backend | No Cognito authorizer — same as APIG4 |
+| `AwsSolutions-IAM4` | Backend, Frontend | CDK-managed Lambda roles use AWS managed policies |
+| `AwsSolutions-IAM5` | Backend, Frontend | Wildcard permissions for X-Ray, AppConfig, and CDK custom resources |
+| `AwsSolutions-L1` | Backend, Frontend | Runtime intentionally pinned to Python 3.12; CDK-managed Lambda runtimes |
+| `AwsSolutions-S1` | Frontend | S3 access logging not enabled for sample app |
+| `AwsSolutions-CFR1/3` | Frontend | CloudFront access logging not enabled for sample app |
+| `AwsSolutions-CFR4` | Frontend | Default CloudFront certificate — no custom domain for sample app |
+| `Serverless-LambdaDLQ` | Backend, Frontend | Synchronous invocation via API Gateway; CDK-managed Lambdas |
+| `Serverless-LambdaDefaultMemorySize` | Backend, Frontend | CDK-managed custom resource Lambdas; `HelloWorldFunction` uses explicit 256 MB |
+| `Serverless-LambdaLatestVersion` | Backend, Frontend | Runtime intentionally pinned; CDK-managed Lambda runtimes |
+| `Serverless-LambdaTracing` | Backend, Frontend | CDK-managed custom resource Lambdas do not expose tracing config |
+| `Serverless-APIGWDefaultThrottling` | Backend | Custom throttling not configured for sample app |
+| `CdkNagValidationFailure` | Backend | Intrinsic function reference prevents `Serverless-APIGWStructuredLogging` from validating |
+| `NIST.800.53.R5-LambdaConcurrency` | Backend, Frontend | Concurrency limits not configured for sample app |
+| `NIST.800.53.R5-LambdaDLQ` | Backend, Frontend | Synchronous invocation; CDK-managed Lambdas |
+| `NIST.800.53.R5-LambdaInsideVPC` | Backend, Frontend | No VPC for sample app — adds significant operational complexity |
+| `NIST.800.53.R5-IAMNoInlinePolicy` | Backend, Frontend | CDK-generated inline policies on service roles — not directly configurable |
+| `NIST.800.53.R5-APIGWAssociatedWithWAF` | Backend | WAF applied at CloudFront, not directly on API Gateway |
+| `NIST.800.53.R5-APIGWCacheEnabledAndEncrypted` | Backend | API Gateway caching not enabled for sample app |
+| `NIST.800.53.R5-APIGWSSLEnabled` | Backend | Client-side SSL certificates not required for sample app |
+| `NIST.800.53.R5-CloudWatchLogGroupEncrypted` | Backend, Frontend | KMS log group encryption adds cost not warranted for sample app |
+| `NIST.800.53.R5-DynamoDBInBackupPlan` | Backend | AWS Backup plan not configured; PITR is enabled |
+| `NIST.800.53.R5-S3BucketLoggingEnabled` | Frontend | S3 access logging not enabled for sample app |
+| `NIST.800.53.R5-S3BucketReplicationEnabled` | Frontend | Static assets are redeployable; replication not needed |
+| `NIST.800.53.R5-S3BucketVersioningEnabled` | Frontend | Static assets are redeployable via `cdk deploy`; versioning not needed |
+| `NIST.800.53.R5-S3DefaultEncryptionKMS` | Frontend | SSE-S3 used; KMS not warranted for public static assets |
+| `NIST.800.53.R5-WAFv2LoggingEnabled` | WAF | WAF logging requires Kinesis/S3 destination — not configured for sample app |
 
-Rules that were previously suppressed and have since been implemented are removed from this list. If you add a suppression, include a clear reason and consider whether it belongs in the TODO list as a future improvement.
+Rules that were previously suppressed and have since been implemented are removed from this list. If you add a suppression, include a clear `reason` and consider whether the finding represents a genuine gap worth addressing in production.
 
 ## Frontend stack
 

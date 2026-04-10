@@ -39,7 +39,7 @@ from aws_cdk import (
 )
 from aws_cdk.aws_lambda_python_alpha import PythonFunction
 from cdk_monitoring_constructs import DefaultDashboardFactory, MonitoringFacade
-from cdk_nag import AwsSolutionsChecks, NagSuppressions
+from cdk_nag import AwsSolutionsChecks, NagSuppressions, NIST80053R5Checks, ServerlessChecks
 from constructs import Construct
 
 
@@ -70,6 +70,8 @@ class HelloWorldStack(Stack):
 
         # cdk-nag: apply AWS Solutions checks
         Aspects.of(self).add(AwsSolutionsChecks(verbose=True))
+        Aspects.of(self).add(ServerlessChecks(verbose=True))
+        Aspects.of(self).add(NIST80053R5Checks(verbose=True))
 
         # DynamoDB table for Powertools idempotency
         idempotency_table = dynamodb.Table(
@@ -148,6 +150,7 @@ class HelloWorldStack(Stack):
             index="app.py",
             handler="lambda_handler",
             architecture=_lambda.Architecture.X86_64,
+            memory_size=256,
             timeout=Duration.seconds(10),
             tracing=_lambda.Tracing.ACTIVE,
             log_group=lambda_log_group,
@@ -269,6 +272,7 @@ class HelloWorldStack(Stack):
             policy=cr.AwsCustomResourcePolicy.from_sdk_calls(
                 resources=cr.AwsCustomResourcePolicy.ANY_RESOURCE,
             ),
+            install_latest_aws_sdk=False,
             log_retention=logs.RetentionDays.ONE_WEEK,
         )
         # Must run after Application Insights has had a chance to create the dashboard
@@ -345,8 +349,9 @@ class HelloWorldStack(Stack):
         NagSuppressions.add_stack_suppressions(
             self,
             [
+                # ── AWS Solutions ────────────────────────────────────────────────
                 {"id": "AwsSolutions-APIG2", "reason": "Request validation not needed for sample app"},
-                {"id": "AwsSolutions-APIG3", "reason": "WAF not needed for sample app"},
+                {"id": "AwsSolutions-APIG3", "reason": "WAF not attached to API Gateway for sample app"},
                 {"id": "AwsSolutions-APIG4", "reason": "Authorization not needed for sample app"},
                 {"id": "AwsSolutions-COG4", "reason": "Cognito authorizer not needed for sample app"},
                 {"id": "AwsSolutions-IAM4", "reason": "Managed policies acceptable for sample app"},
@@ -354,6 +359,68 @@ class HelloWorldStack(Stack):
                     "id": "AwsSolutions-IAM5",
                     "reason": "Wildcard permissions for X-Ray, AppConfig, and CloudWatch dashboard cleanup custom resource",
                 },
-                {"id": "AwsSolutions-L1", "reason": "Runtime version is intentionally pinned"},
+                {"id": "AwsSolutions-L1", "reason": "Runtime version is intentionally pinned to Python 3.12"},
+                # ── Serverless ───────────────────────────────────────────────────
+                {
+                    "id": "Serverless-LambdaDLQ",
+                    "reason": "Lambda is invoked synchronously via API Gateway — async DLQ pattern does not apply",
+                },
+                {
+                    "id": "Serverless-LambdaDefaultMemorySize",
+                    "reason": "CDK-managed custom resource Lambdas do not expose memory configuration",
+                },
+                {
+                    "id": "Serverless-LambdaLatestVersion",
+                    "reason": "Runtime version is intentionally pinned to Python 3.12",
+                },
+                {
+                    "id": "Serverless-APIGWDefaultThrottling",
+                    "reason": "Custom throttling not configured for sample app",
+                },
+                {
+                    "id": "Serverless-LambdaTracing",
+                    "reason": "CDK-managed custom resource Lambdas do not expose tracing configuration",
+                },
+                {
+                    "id": "CdkNagValidationFailure",
+                    "reason": "Serverless-APIGWStructuredLogging validation fails due to intrinsic function reference in access log destination — structured logging is configured via logging_format=JSON on the Lambda",
+                },
+                # ── NIST 800-53 R5 ──────────────────────────────────────────────
+                {
+                    "id": "NIST.800.53.R5-LambdaConcurrency",
+                    "reason": "Concurrency limits not configured for sample app",
+                },
+                {
+                    "id": "NIST.800.53.R5-LambdaDLQ",
+                    "reason": "Lambda is invoked synchronously via API Gateway — async DLQ pattern does not apply",
+                },
+                {
+                    "id": "NIST.800.53.R5-LambdaInsideVPC",
+                    "reason": "No VPC for sample app — VPC adds significant operational complexity",
+                },
+                {
+                    "id": "NIST.800.53.R5-IAMNoInlinePolicy",
+                    "reason": "Inline policies are CDK-generated on Lambda service roles and custom resource providers — not directly configurable",
+                },
+                {
+                    "id": "NIST.800.53.R5-APIGWAssociatedWithWAF",
+                    "reason": "WAF not attached to API Gateway for sample app — WAF is applied at CloudFront in the frontend stack",
+                },
+                {
+                    "id": "NIST.800.53.R5-APIGWCacheEnabledAndEncrypted",
+                    "reason": "API Gateway caching not enabled for sample app",
+                },
+                {
+                    "id": "NIST.800.53.R5-APIGWSSLEnabled",
+                    "reason": "Client-side SSL certificates not required for sample app",
+                },
+                {
+                    "id": "NIST.800.53.R5-CloudWatchLogGroupEncrypted",
+                    "reason": "KMS encryption for CloudWatch log groups adds cost and operational overhead not warranted for sample app",
+                },
+                {
+                    "id": "NIST.800.53.R5-DynamoDBInBackupPlan",
+                    "reason": "AWS Backup plan not configured for sample app — PITR is enabled for point-in-time recovery",
+                },
             ],
         )

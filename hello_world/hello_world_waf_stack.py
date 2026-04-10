@@ -8,7 +8,7 @@ from aws_cdk import (
 from aws_cdk import (
     aws_wafv2 as wafv2,
 )
-from cdk_nag import AwsSolutionsChecks
+from cdk_nag import AwsSolutionsChecks, NagSuppressions, NIST80053R5Checks, ServerlessChecks
 from constructs import Construct
 
 
@@ -36,6 +36,8 @@ class HelloWorldWafStack(Stack):
         super().__init__(scope, construct_id, **kwargs)
 
         Aspects.of(self).add(AwsSolutionsChecks(verbose=True))
+        Aspects.of(self).add(ServerlessChecks(verbose=True))
+        Aspects.of(self).add(NIST80053R5Checks(verbose=True))
 
         web_acl = wafv2.CfnWebACL(
             self,
@@ -124,6 +126,16 @@ class HelloWorldWafStack(Stack):
         # When the frontend stack is in a different region, CDK bridges this
         # value automatically via SSM (cross_region_references=True on the consumer).
         self.web_acl_arn = web_acl.attr_arn
+
+        NagSuppressions.add_stack_suppressions(
+            self,
+            [
+                {
+                    "id": "NIST.800.53.R5-WAFv2LoggingEnabled",
+                    "reason": "WAF logging requires a Kinesis Data Firehose or S3 destination — not configured for sample app",
+                },
+            ],
+        )
 
         CfnOutput(
             self,

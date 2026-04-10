@@ -23,7 +23,7 @@ from aws_cdk import (
 from aws_cdk import (
     aws_s3_deployment as s3deploy,
 )
-from cdk_nag import AwsSolutionsChecks, NagSuppressions
+from cdk_nag import AwsSolutionsChecks, NagSuppressions, NIST80053R5Checks, ServerlessChecks
 from constructs import Construct
 
 
@@ -53,6 +53,8 @@ class HelloWorldFrontendStack(Stack):
         super().__init__(scope, construct_id, **kwargs)
 
         Aspects.of(self).add(AwsSolutionsChecks(verbose=True))
+        Aspects.of(self).add(ServerlessChecks(verbose=True))
+        Aspects.of(self).add(NIST80053R5Checks(verbose=True))
 
         # ── S3 bucket ────────────────────────────────────────────────────────
         # Fully private — CloudFront OAC is the only allowed reader.
@@ -156,9 +158,10 @@ class HelloWorldFrontendStack(Stack):
         NagSuppressions.add_stack_suppressions(
             self,
             [
+                # ── AWS Solutions ────────────────────────────────────────────────
                 {
                     "id": "AwsSolutions-S1",
-                    "reason": "Access logging to a second S3 bucket not warranted for sample app",
+                    "reason": "S3 access logging not enabled for sample app",
                 },
                 {"id": "AwsSolutions-CFR1", "reason": "CloudFront access logging not enabled for sample app"},
                 {"id": "AwsSolutions-CFR3", "reason": "CloudFront access logging not enabled for sample app"},
@@ -166,8 +169,62 @@ class HelloWorldFrontendStack(Stack):
                     "id": "AwsSolutions-CFR4",
                     "reason": "Using default CloudFront certificate — no custom domain for sample app",
                 },
-                {"id": "AwsSolutions-IAM4", "reason": "BucketDeployment custom resource uses managed policies"},
+                {"id": "AwsSolutions-IAM4", "reason": "BucketDeployment custom resource uses CDK-managed policies"},
                 {"id": "AwsSolutions-IAM5", "reason": "BucketDeployment requires wildcard on destination bucket"},
-                {"id": "AwsSolutions-L1", "reason": "BucketDeployment custom resource Lambda runtime is CDK-managed"},
+                {"id": "AwsSolutions-L1", "reason": "BucketDeployment and auto-delete Lambda runtimes are CDK-managed"},
+                # ── Serverless ───────────────────────────────────────────────────
+                {
+                    "id": "Serverless-LambdaDLQ",
+                    "reason": "CDK-managed BucketDeployment and auto-delete Lambdas do not expose DLQ configuration",
+                },
+                {
+                    "id": "Serverless-LambdaDefaultMemorySize",
+                    "reason": "CDK-managed BucketDeployment and auto-delete Lambdas do not expose memory configuration",
+                },
+                {
+                    "id": "Serverless-LambdaLatestVersion",
+                    "reason": "CDK-managed Lambda runtimes are not directly configurable",
+                },
+                {
+                    "id": "Serverless-LambdaTracing",
+                    "reason": "CDK-managed BucketDeployment and auto-delete Lambdas do not expose tracing configuration",
+                },
+                # ── NIST 800-53 R5 ──────────────────────────────────────────────
+                {
+                    "id": "NIST.800.53.R5-LambdaConcurrency",
+                    "reason": "CDK-managed Lambdas do not expose concurrency configuration",
+                },
+                {
+                    "id": "NIST.800.53.R5-LambdaDLQ",
+                    "reason": "CDK-managed BucketDeployment and auto-delete Lambdas do not expose DLQ configuration",
+                },
+                {
+                    "id": "NIST.800.53.R5-LambdaInsideVPC",
+                    "reason": "No VPC for sample app — CDK-managed Lambdas also do not expose VPC configuration",
+                },
+                {
+                    "id": "NIST.800.53.R5-IAMNoInlinePolicy",
+                    "reason": "Inline policies are CDK-generated on BucketDeployment and auto-delete service roles — not directly configurable",
+                },
+                {
+                    "id": "NIST.800.53.R5-S3BucketLoggingEnabled",
+                    "reason": "S3 access logging not enabled for sample app",
+                },
+                {
+                    "id": "NIST.800.53.R5-S3BucketReplicationEnabled",
+                    "reason": "S3 replication not needed for sample app — static assets are redeployable",
+                },
+                {
+                    "id": "NIST.800.53.R5-S3BucketVersioningEnabled",
+                    "reason": "S3 versioning not needed for sample app — static assets are redeployable via cdk deploy",
+                },
+                {
+                    "id": "NIST.800.53.R5-S3DefaultEncryptionKMS",
+                    "reason": "SSE-S3 encryption used — KMS not warranted for public static assets in sample app",
+                },
+                {
+                    "id": "NIST.800.53.R5-CloudWatchLogGroupEncrypted",
+                    "reason": "KMS encryption for CloudWatch log groups adds cost and operational overhead not warranted for sample app",
+                },
             ],
         )
