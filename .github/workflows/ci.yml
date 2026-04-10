@@ -55,3 +55,42 @@ jobs:
         with:
           name: coverage-report
           path: report.html
+
+  cdk-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install pip-tools
+        run: pip install pip-tools
+
+      - name: Install CDK and dev dependencies
+        run: pip-sync requirements.txt
+
+      - name: Install pytest (separate from pip-sync to avoid attrs conflict)
+        run: pip install pytest pytest-mock
+
+      - name: Install CDK CLI
+        run: npm install -g aws-cdk
+
+      - name: Run cdk synth
+        env:
+          CDK_DEFAULT_ACCOUNT: "123456789012"
+          CDK_DEFAULT_REGION: us-east-1
+          AWS_DEFAULT_REGION: us-east-1
+        run: cdk synth --no-notices --quiet
+
+      - name: Run CDK stack assertion tests
+        env:
+          AWS_DEFAULT_REGION: us-east-1
+        run: python -m pytest tests/unit/test_stacks.py -v --override-ini="addopts=" --timeout=120

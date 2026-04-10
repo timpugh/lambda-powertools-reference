@@ -7,4 +7,7 @@ Welcome to the Lambda Powertools Reference project documentation.
 
 lambda_handler
 cdk_stack
+hello_world_waf_stack
+hello_world_frontend_stack
+nag_utils
 ```

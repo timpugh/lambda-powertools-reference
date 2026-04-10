@@ -319,13 +319,21 @@ python -m pytest tests/unit -v
 
 ### Integration tests
 
-Integration tests call the live API Gateway endpoint and verify the response body, content type headers, and response time (under 10 seconds, to account for Lambda cold starts with SSM and AppConfig initialization). The stack name is read from `AWS_SAM_STACK_NAME` in `pyproject.toml` (defaults to `HelloWorld-us-east-1`). Override it for a different region:
+Two suites of integration tests verify the live deployment:
+
+**API Gateway** (`tests/integration/test_api_gateway.py`) — calls the live API Gateway endpoint and verifies the response body, content type headers, and response time (under 10 seconds, to account for Lambda cold starts with SSM and AppConfig initialization). The backend stack name is read from `AWS_SAM_STACK_NAME` in `pyproject.toml` (defaults to `HelloWorld-us-east-1`). Override for a different region:
 
 ```bash
 AWS_SAM_STACK_NAME=HelloWorld-ap-southeast-1 pytest tests/integration/
 ```
 
-If the stack is not deployed, integration tests skip automatically rather than failing — so the default `pytest` run stays green without a live deployment. Other test environment variables are configured in `pyproject.toml` via pytest-env (see the `env` key under `[tool.pytest.ini_options]`).
+**CloudFront / S3** (`tests/integration/test_frontend.py`) — fetches the CloudFront distribution URL from the frontend stack outputs and verifies that the index page is served, `config.json` contains the injected API URL, HTTPS is enforced, security headers are present, and unknown paths fall back to `index.html` (SPA routing). The frontend stack name is read from `AWS_SAM_FRONTEND_STACK_NAME` in `pyproject.toml` (defaults to `HelloWorldFrontend-us-east-1`). Override for a different region:
+
+```bash
+AWS_SAM_FRONTEND_STACK_NAME=HelloWorldFrontend-ap-southeast-1 pytest tests/integration/
+```
+
+If either stack is not deployed, its tests skip automatically rather than failing — so the default `pytest` run stays green without a live deployment. Other test environment variables are configured in `pyproject.toml` via pytest-env (see the `env` key under `[tool.pytest.ini_options]`).
 
 All test environment variables are centralized in `pyproject.toml` rather than scattered across test files. Note that `POWERTOOLS_IDEMPOTENCY_DISABLED=true` is only active during test runs — in production, this env var is not set, so idempotency is fully active against the DynamoDB table.
 
@@ -566,16 +574,19 @@ Four workflows are configured:
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| **CI** | Push / PR to `main` | Runs pre-commit hooks (quality job) and pytest unit tests (test job) |
+| **CI** | Push / PR to `main` | Three jobs: pre-commit hooks (`quality`), pytest unit tests (`test`), CDK synth + stack assertion tests (`cdk-check`) |
 | **Docs** | Push to `main` | Builds Sphinx docs and deploys to GitHub Pages |
 | **Dependency Audit** | Every Monday 9am UTC | Runs `pip-audit` across all requirements files |
 | **Dependabot Auto-merge** | Dependabot PRs | Approves and auto-merges GitHub Actions version updates when CI passes |
 
-Both the `quality` and `test` CI jobs must pass before anything can merge to `main` (branch protection).
+All three CI jobs must pass before anything can merge to `main` (branch protection).
 
 The CI installs dependencies with `pip-sync` to match the local dev workflow exactly:
 - `quality` job: `pip-sync requirements.txt`
 - `test` job: `pip-sync tests/requirements.txt lambda/requirements.txt`
+- `cdk-check` job: `pip-sync requirements.txt` (CDK) + `pip install pytest pytest-mock` (test runner, added separately to avoid the `attrs` version conflict between CDK and Lambda dependencies) + CDK CLI via `npm install -g aws-cdk`
+
+The `cdk-check` job runs `cdk synth` to catch unsuppressed cdk-nag findings, then runs `tests/unit/test_stacks.py` which uses `aws_cdk.assertions.Template` to verify key security properties of each synthesized stack (KMS encryption, DynamoDB PITR, API Gateway caching, CloudFront TLS version, etc.). Asset bundling (Docker) is skipped via the `aws:cdk:bundling-stacks` context key so the job runs without Docker build time.
 
 ### Dependabot
 
@@ -618,6 +629,8 @@ Full rule documentation: [github.com/cdklabs/cdk-nag/blob/main/RULES.md](https:/
 
 Not every rule is appropriate for a sample application. Where a rule has been intentionally suppressed, the suppression lives in the stack file in either `NagSuppressions.add_stack_suppressions` (stack-wide) or `NagSuppressions.add_resource_suppressions`/`add_resource_suppressions_by_path` (targeted to a specific resource). Each entry includes a `reason` field explaining why it was suppressed rather than fixed.
 
+Stack-level suppressions are reserved for findings that are genuinely stack-wide (e.g., no custom domain, no VPC by design). Everything else is suppressed at the resource level to keep the blast radius of each suppression as small as possible. CDK-managed singleton Lambdas (BucketDeployment provider, LogRetention, S3AutoDeleteObjects, AwsCustomResource) share a common suppression list defined in `hello_world/nag_utils.py` (`CDK_LAMBDA_SUPPRESSIONS`) and are targeted by their stable CDK construct IDs using `add_resource_suppressions_by_path`. `AwsSolutions-IAM5` suppressions on `HelloWorldFunction` use the `applies_to` parameter to scope them to specific wildcard actions and resources rather than suppressing all IAM5 findings on the role.
+
 **What is encrypted with CMK:**
 All CloudWatch log groups (Lambda, API Gateway access, API Gateway execution, WAF, auto-delete Lambda), DynamoDB, and the S3 frontend bucket use AWS KMS customer-managed keys with annual key rotation enabled. The S3 access logging bucket uses SSE-S3 because the S3 log delivery service does not support KMS-encrypted target buckets. SSM parameters cannot use CMK (CloudFormation limitation — SecureString is not supported). AppConfig hosted configurations use AWS-managed keys (no CMK option in CDK).
 
@@ -629,22 +642,22 @@ Current suppressions across all stacks:
 | `AwsSolutions-APIG3` | Backend | Stack | WAF applied at CloudFront, not directly on API Gateway |
 | `AwsSolutions-APIG4` | Backend | Stack | No authorizer — auth is out of scope for this sample |
 | `AwsSolutions-COG4` | Backend | Stack | No Cognito authorizer — same as APIG4 |
-| `AwsSolutions-IAM4` | Backend, Frontend | Stack | CDK-managed Lambda roles use AWS managed policies |
-| `AwsSolutions-IAM5` | Backend, Frontend, WAF | Stack | Wildcard permissions for X-Ray, AppConfig, KMS grants, and CDK custom resources |
-| `AwsSolutions-L1` | Backend, Frontend | Stack | Runtime pinned to Python 3.12; CDK-managed Lambda runtimes |
+| `AwsSolutions-IAM4` | Backend, Frontend | Per-resource (CDK singletons + HelloWorldFunction) | CDK-managed Lambda roles use AWS managed policies; not configurable by the caller |
+| `AwsSolutions-IAM5` | Backend, Frontend, WAF | Per-resource (with `applies_to`) | Wildcard permissions scoped to specific actions — X-Ray, KMS `GenerateDataKey*`/`ReEncrypt*`, CDK custom resource `Resource::*` |
+| `AwsSolutions-L1` | Backend, Frontend | Per-resource (CDK singletons) | CDK-managed Lambda runtimes are not configurable; `HelloWorldFunction` is pinned to Python 3.12 |
 | `AwsSolutions-S1` | Frontend | Resource (log bucket) | The access log bucket itself — logging to itself would be circular |
 | `AwsSolutions-CFR1/3` | Frontend | Stack | CloudFront access logging not enabled for sample app |
 | `AwsSolutions-CFR4` | Frontend | Stack | Default CloudFront certificate — no custom domain for sample app |
-| `Serverless-LambdaDLQ` | Backend, Frontend | Stack | Synchronous invocation via API Gateway; CDK-managed Lambdas |
-| `Serverless-LambdaDefaultMemorySize` | Backend, Frontend | Stack | CDK-managed singleton Lambdas; `HelloWorldFunction` uses explicit 256 MB |
-| `Serverless-LambdaLatestVersion` | Backend, Frontend | Stack | Runtime pinned to Python 3.12; CDK-managed runtimes |
+| `Serverless-LambdaDLQ` | Backend, Frontend | Per-resource (CDK singletons) | CDK-managed Lambdas — DLQ is not configurable; `HelloWorldFunction` is synchronously invoked via API Gateway |
+| `Serverless-LambdaDefaultMemorySize` | Backend, Frontend | Per-resource (CDK singletons) | CDK-managed singleton Lambdas — memory is not configurable; `HelloWorldFunction` uses explicit 256 MB |
+| `Serverless-LambdaLatestVersion` | Backend, Frontend | Per-resource (CDK singletons) | CDK-managed Lambda runtimes are not configurable |
 | `Serverless-LambdaTracing` | Backend, Frontend | Per-resource (CDK singletons only) | CDK-managed provider Lambdas do not expose tracing config; `HelloWorldFunction` passes natively |
 | `Serverless-APIGWDefaultThrottling` | Backend | Stack | Custom throttling not configured for sample app |
 | `CdkNagValidationFailure` | Backend | Stack | Intrinsic function reference prevents `Serverless-APIGWStructuredLogging` from validating |
-| `NIST.800.53.R5-LambdaConcurrency` | Backend, Frontend | Stack | Concurrency limits not configured for sample app |
-| `NIST.800.53.R5-LambdaDLQ` | Backend, Frontend | Stack | Synchronous invocation; CDK-managed Lambdas |
-| `NIST.800.53.R5-LambdaInsideVPC` | Backend, Frontend | Stack | No VPC — adds significant operational complexity for sample app |
-| `NIST.800.53.R5-IAMNoInlinePolicy` | Backend, Frontend, WAF | Stack | CDK-generated inline policies on service roles — not directly configurable |
+| `NIST.800.53.R5-LambdaConcurrency` | Backend, Frontend | Per-resource (CDK singletons) | CDK-managed singleton Lambdas — concurrency is not configurable |
+| `NIST.800.53.R5-LambdaDLQ` | Backend, Frontend | Per-resource (CDK singletons) | CDK-managed Lambdas — DLQ is not configurable; `HelloWorldFunction` is synchronously invoked |
+| `NIST.800.53.R5-LambdaInsideVPC` | Backend, Frontend | Per-resource (CDK singletons) | CDK-managed singleton Lambdas — VPC is not configurable |
+| `NIST.800.53.R5-IAMNoInlinePolicy` | Backend, Frontend, WAF | Per-resource | CDK-generated inline policies on singleton service roles — not directly configurable |
 | `NIST.800.53.R5-APIGWAssociatedWithWAF` | Backend | Stack | WAF applied at CloudFront, not directly on API Gateway |
 | `NIST.800.53.R5-APIGWSSLEnabled` | Backend | Stack | Client-side SSL certificates not required for sample app |
 | `NIST.800.53.R5-DynamoDBInBackupPlan` | Backend | Stack | AWS Backup plan not configured; PITR is enabled for point-in-time recovery |
@@ -764,7 +777,7 @@ The stack includes a [cdk-monitoring-constructs](https://github.com/cdklabs/cdk-
 
 ## Documentation
 
-Project documentation is generated from docstrings and markdown files using Sphinx with MyST-Parser. Source files are in `docs/`. Doc builds are best run in CI/CD pipelines or manually before publishing, rather than on every commit.
+Project documentation is generated from docstrings and markdown files using Sphinx with MyST-Parser. Source files are in `docs/`. All four modules are documented: `lambda/app.py` (Lambda handler), `hello_world/hello_world_stack.py` (backend), `hello_world/hello_world_waf_stack.py` (WAF), `hello_world/hello_world_frontend_stack.py` (frontend), and `hello_world/nag_utils.py` (shared suppression utilities). Doc builds are best run in CI/CD pipelines or manually before publishing, rather than on every commit.
 
 ```bash
 # Build HTML docs
@@ -865,6 +878,8 @@ pip install -r tests/requirements.txt -r lambda/requirements.txt
 **attrs version conflict** — `requirements.txt` (dev) pins `attrs==25.4.0` for CDK compatibility, while `lambda/requirements.txt` pins `attrs==26.1.0` for Powertools. These two versions cannot coexist in a single environment. This is why the CI is split into separate `quality` and `test` jobs, and why local test deps are installed with `pip install -r` (additive) rather than `pip-sync` (destructive).
 
 **SSM parameter path is hardcoded** — the greeting parameter is stored at `/HelloWorld/greeting` in SSM, matching the stack name. This is intentional for a reference project but would be parameterised in a production stack.
+
+**CORS is open (`allow_origin="*"`)** — the Lambda handler configures `APIGatewayRestResolver` with `CORSConfig(allow_origin="*")` for simplicity. In production, restrict this to the specific CloudFront domain (e.g., `allow_origin="https://d1234.cloudfront.net"`) and set `allow_credentials=True` if the API requires cookies or Authorization headers. Leaving CORS open in production allows any origin to call the API from a browser.
 
 **Error handling** — the handler demonstrates the recommended pattern for production Lambda error handling. Critical downstream failures (SSM) return a 500 via `InternalServerError` so the API always responds with a meaningful HTTP status rather than a Lambda runtime error. Non-critical failures (AppConfig feature flags) fall back to a safe default rather than failing the whole request. As you extend this project, apply the same pattern to any new downstream calls: decide whether the failure is critical (raise `InternalServerError`) or non-critical (log a warning, use a default), and add a corresponding unit test for each path.
 
