@@ -50,7 +50,7 @@ jobs:
         run: python -m pytest tests/unit -v
 
       - name: Upload coverage report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: coverage-report
