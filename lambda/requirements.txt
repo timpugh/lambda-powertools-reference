@@ -32,9 +32,9 @@ boto3==1.42.83 \
     # via
     #   -r requirements.in
     #   aws-encryption-sdk
-botocore==1.42.83 \
-    --hash=sha256:34bc8cb64b17ac17f8901f073fe4fc9572a5cac9393a37b2b3ea372a83b87f4a \
-    --hash=sha256:ec0c3ecb3772936ed22a3bdda09883b34858933f71004686d460d829bab39d8e
+botocore==1.42.88 \
+    --hash=sha256:032375b213305b6b81eedb269eaeefdf96f674620799bbf96117dca86052cc1a \
+    --hash=sha256:cbb59ee464662039b0c2c95a520cdf85b1e8ce00b72375ab9cd9f842cc001301
     # via
     #   aws-xray-sdk
     #   boto3
