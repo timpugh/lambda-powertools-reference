@@ -3,7 +3,7 @@ PYTHON := python3
 VENV := .venv
 PIP := pip
 
-.PHONY: help install install-dev test test-integration lint format typecheck security docs docs-open compile upgrade clean
+.PHONY: help install install-dev test test-cdk test-integration lint format typecheck security cdk-synth docs docs-open compile upgrade clean
 
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -30,12 +30,18 @@ install-dev: ## Install dev dependencies only (no test/lambda deps)
 test: ## Run unit tests with coverage
 	$(PYTHON) -m pytest tests/unit -v
 
+test-cdk: ## Run CDK stack assertion tests (requires aws_cdk — use make install, not make install-dev)
+	$(PYTHON) -m pytest tests/unit/test_stacks.py -v --override-ini="addopts=" --timeout=120
+
 test-integration: ## Run integration tests (requires deployed stack)
 	$(PYTHON) -m pytest tests/integration -v
 
 # =============================================================================
 # Code quality
 # =============================================================================
+
+cdk-synth: ## Synthesize all CDK stacks and validate cdk-nag rules (requires CDK CLI: npm install -g aws-cdk)
+	cdk synth --no-notices
 
 lint: ## Run all pre-commit hooks (ruff, mypy, pylint, bandit, xenon, pip-audit)
 	pre-commit run --all-files
