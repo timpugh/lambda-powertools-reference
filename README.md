@@ -67,19 +67,44 @@ These are available from `aws_lambda_powertools.utilities.data_classes` and requ
 
 ## AWS resources provisioned
 
-The CDK stack (`hello_world/hello_world_stack.py`) creates the following resources:
+Resources are split across three stacks. All resources in all stacks have `RemovalPolicy.DESTROY` so `cdk destroy` leaves nothing behind.
+
+**`HelloWorldWaf-{region}`** (always in `us-east-1`):
 
 | Resource | Purpose |
 |---|---|
-| Lambda Function | Runs the hello-world handler with Powertools |
-| API Gateway REST API | Exposes `GET /hello` with X-Ray tracing |
-| DynamoDB Table | Stores idempotency records (TTL-enabled, PAY_PER_REQUEST) |
-| SSM Parameter | Stores the greeting message (`/{stack}/greeting`) |
-| AppConfig Application | Hosts feature flag configuration |
-| AppConfig Environment | `production` environment for feature flags |
-| AppConfig Configuration Profile | `features` profile with `AWS.AppConfig.FeatureFlags` type |
+| WAF WebACL | CloudFront-scoped WebACL with 4 managed rules + rate limiting |
+| KMS Key | Encrypts the WAF log group |
+| CloudWatch Log Group (`aws-waf-logs-*`) | Receives WAF access logs |
+
+**`HelloWorld-{region}`** (backend, target region):
+
+| Resource | Purpose |
+|---|---|
+| KMS Key | Encrypts all log groups and DynamoDB |
+| Lambda Function | Runs the hello-world handler (256 MB, X-Ray tracing, JSON logging) |
+| CloudWatch Log Group | Lambda log group with 1-week retention, KMS-encrypted |
+| API Gateway REST API | Exposes `GET /hello` with X-Ray tracing, 0.5 GB encrypted cache |
+| CloudWatch Log Group (access) | API Gateway access logs, KMS-encrypted |
+| CloudWatch Log Group (execution) | API Gateway execution logs, KMS-encrypted |
+| DynamoDB Table | Idempotency records (TTL, PAY_PER_REQUEST, PITR, KMS-encrypted) |
+| SSM Parameter | Greeting message (`/{stack}/greeting`) |
+| AppConfig Application | Feature flag configuration |
+| AppConfig Environment | `{stack}-env` environment for feature flags |
+| AppConfig Configuration Profile | `{stack}-features` profile with `AWS.AppConfig.FeatureFlags` type |
 | Resource Group + Application Insights | CloudWatch Application Insights monitoring |
-| CloudWatch Dashboard | Auto-generated via cdk-monitoring-constructs |
+| CloudWatch Dashboard | Lambda, API GW, DynamoDB metrics via cdk-monitoring-constructs |
+| Custom Resource (`AppInsightsDashboardCleanup`) | Deletes the Application Insights auto-created dashboard on destroy |
+
+**`HelloWorldFrontend-{region}`** (frontend, target region):
+
+| Resource | Purpose |
+|---|---|
+| KMS Key | Encrypts the frontend S3 bucket and auto-delete Lambda log group |
+| S3 Bucket (frontend) | Private static assets, KMS-encrypted, server access logging enabled |
+| S3 Bucket (access logs) | Receives S3 server access logs (SSE-S3 — log delivery requires it) |
+| CloudFront Distribution | HTTPS-only, TLS 1.2+, WAF-protected, SECURITY_HEADERS policy |
+| CloudWatch Log Group (auto-delete) | Auto-delete Lambda log group, KMS-encrypted |
 
 ## Quick start
 
@@ -165,7 +190,26 @@ cdk deploy --all
 
 The `cdk synth` and `cdk deploy` commands use Finch to build a container that installs the Lambda dependencies from `lambda/requirements.txt` into the deployment package. The first run will be slower as it pulls the SAM build image.
 
-You can find your API Gateway Endpoint URL in the output values displayed after deployment.
+After deployment, CloudFormation outputs useful values directly in the terminal. Each stack exposes the following:
+
+**`HelloWorldWaf-{region}`:**
+- `WebAclArn` — WAF WebACL ARN (also used internally by the frontend stack)
+- `WebAclId` — WAF WebACL logical ID
+- `WafLogGroupName` — CloudWatch log group name for WAF access logs
+
+**`HelloWorld-{region}`:**
+- `HelloWorldApiOutput` — API Gateway endpoint URL (`https://.../Prod/hello`)
+- `HelloWorldFunctionOutput` — Lambda function ARN
+- `HelloWorldFunctionIamRoleOutput` — Lambda IAM role ARN
+- `IdempotencyTableName` — DynamoDB table name
+- `GreetingParameterName` — SSM parameter path
+- `AppConfigAppName` — AppConfig application name
+- `CloudWatchDashboardUrl` — Direct link to the CloudWatch monitoring dashboard
+
+**`HelloWorldFrontend-{region}`:**
+- `CloudFrontDomainName` — `https://` URL to open in a browser
+- `CloudFrontDistributionId` — Distribution ID for manual cache invalidations
+- `FrontendBucketName` — S3 bucket name for direct asset inspection
 
 ### Deploying to a different region
 
@@ -275,7 +319,13 @@ python -m pytest tests/unit -v
 
 ### Integration tests
 
-Integration tests call the live API Gateway endpoint, so the stack must be deployed first. They verify the response body, content type headers, and response time (under 5 seconds). The stack name and other test environment variables are configured in `pyproject.toml` via pytest-env (see the `env` key under `[tool.pytest.ini_options]`).
+Integration tests call the live API Gateway endpoint and verify the response body, content type headers, and response time (under 10 seconds, to account for Lambda cold starts with SSM and AppConfig initialization). The stack name is read from `AWS_SAM_STACK_NAME` in `pyproject.toml` (defaults to `HelloWorld-us-east-1`). Override it for a different region:
+
+```bash
+AWS_SAM_STACK_NAME=HelloWorld-ap-southeast-1 pytest tests/integration/
+```
+
+If the stack is not deployed, integration tests skip automatically rather than failing — so the default `pytest` run stays green without a live deployment. Other test environment variables are configured in `pyproject.toml` via pytest-env (see the `env` key under `[tool.pytest.ini_options]`).
 
 All test environment variables are centralized in `pyproject.toml` rather than scattered across test files. Note that `POWERTOOLS_IDEMPOTENCY_DISABLED=true` is only active during test runs — in production, this env var is not set, so idempotency is fully active against the DynamoDB table.
 
@@ -669,7 +719,9 @@ The backend exposes `api_url` as a stack property. The frontend stack injects it
 
 ### S3 bucket
 
-The bucket is fully private — no public access of any kind. CloudFront reaches it exclusively via [Origin Access Control (OAC)](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html), the current AWS-recommended successor to OAI. The bucket is encrypted with SSE-S3, has SSL enforced, versioning disabled (git is the source of truth), and `auto_delete_objects=True` so `cdk destroy` empties and deletes it cleanly.
+The bucket is fully private — no public access of any kind. CloudFront reaches it exclusively via [Origin Access Control (OAC)](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html), the current AWS-recommended successor to OAI. The bucket is encrypted with SSE-KMS (customer-managed key with annual rotation), has SSL enforced, server access logging enabled to a dedicated log bucket, versioning disabled (git is the source of truth), and `auto_delete_objects=True` so `cdk destroy` empties and deletes it cleanly.
+
+The access log bucket uses SSE-S3 rather than SSE-KMS — the S3 log delivery service does not support writing to KMS-encrypted target buckets.
 
 ### CloudFront distribution
 
@@ -695,6 +747,8 @@ The WebACL sits in front of CloudFront and inspects every request before it reac
 | 3 | `RateLimitPerIP` (custom) | Blocks any single IP exceeding 1,000 requests per 5 minutes |
 
 All rules emit CloudWatch metrics and sampled requests, so WAF activity is visible in the console without additional configuration.
+
+WAF access logs are written to a CloudWatch Logs log group named `aws-waf-logs-{stack_name}` (the `aws-waf-logs-` prefix is an AWS requirement). The log group is KMS-encrypted with a customer-managed key and has 1-week retention.
 
 The WAF WebACL lives in `HelloWorldWafStack` which is always pinned to `us-east-1`. This is an AWS hard constraint for CloudFront-scoped WebACLs. The cross-region reference pattern described above handles wiring the ARN to CloudFront automatically regardless of where the frontend stack is deployed.
 
