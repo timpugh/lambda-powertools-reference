@@ -1,7 +1,7 @@
 # Constrain shared packages to match lambda versions
 -c ../lambda/requirements.txt
 
-pytest==9.0.2
+pytest==9.0.3
 pytest-env==1.6.0
 pytest-cov==7.1.0
 pytest-xdist==3.8.0
