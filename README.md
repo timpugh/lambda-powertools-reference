@@ -9,9 +9,13 @@
 
 This project contains source code and supporting files for a serverless application that you can deploy with the AWS CDK. It includes the following files and folders.
 
-- `app.py` - CDK entry point; instantiates the `HelloWorldStack` and calls `app.synth()`
+- `app.py` - CDK entry point; instantiates the WAF, backend, and frontend stacks and calls `app.synth()`
 - `lambda/` - Code for the application's Lambda function
-- `hello_world/hello_world_stack.py` - The CDK stack that defines all AWS resources
+- `hello_world/hello_world_stack.py` - The backend CDK stack (Lambda, API Gateway, DynamoDB, SSM, AppConfig)
+- `hello_world/hello_world_waf_stack.py` - The WAF stack (CloudFront-scoped WebACL, always in `us-east-1`)
+- `hello_world/hello_world_frontend_stack.py` - The frontend stack (S3 + CloudFront)
+- `hello_world/nag_utils.py` - Shared cdk-nag suppression list for CDK-managed singleton Lambdas
+- `frontend/` - Static assets (`index.html`) deployed to the frontend S3 bucket
 - `events/event.json` - A sample API Gateway proxy event for local SAM invocation
 - `tests/` - Unit and integration tests
 - `tests/conftest.py` - Shared test fixtures (API Gateway event, Lambda context, mocks)
@@ -19,11 +23,14 @@ This project contains source code and supporting files for a serverless applicat
 - `pyproject.toml` - Consolidated tool configuration (ruff, mypy, pylint, pytest, coverage)
 - `.pre-commit-config.yaml` - Pre-commit hook definitions (runs on every `git commit`)
 - `.bandit` - Bandit security scanner configuration (excluded directories)
+- `.vscode/` - VS Code workspace settings and recommended extensions (ruff, mypy, pylint, pytest)
+- `.github/workflows/` - GitHub Actions workflows (`ci.yml`, `docs.yml`, `dependency-audit.yml`, `dependabot-auto-merge.yml`)
 - `.github/dependabot.yml` - Dependabot configuration (weekly GitHub Actions version checks)
-- `.github/workflows/dependabot-auto-merge.yml` - Auto-merges Dependabot PRs when CI passes
 - `Makefile` - Common development commands (`make help` to list all targets)
+- `LICENSE` - Apache 2.0 license
+- `TODO.md` - Outstanding work and deferred items
 
-The application uses several AWS resources, including Lambda functions, an API Gateway API, a DynamoDB table, SSM parameters, and AppConfig. These resources are defined in the `hello_world/hello_world_stack.py` file in this project. The Lambda function uses [AWS Lambda Powertools](https://docs.powertools.aws.dev/lambda/python/latest/) extensively — see the [Lambda Powertools features](#lambda-powertools-features) section below for details. Note that Powertools Tracer currently depends on the `aws-xray-sdk`, which is approaching deprecation. There is an [open RFC](https://github.com/aws-powertools/powertools-lambda/discussions/90) to replace it with OpenTelemetry as the tracing provider. You can update the stack to add AWS resources through the same deployment process that updates your application code.
+The application uses several AWS resources, including Lambda functions, an API Gateway API, a DynamoDB table, SSM parameters, AppConfig, an S3-backed CloudFront distribution, and a WAF WebACL. These resources are split across three stack files in `hello_world/` (`hello_world_stack.py` for the backend, `hello_world_waf_stack.py` for WAF, and `hello_world_frontend_stack.py` for S3/CloudFront). The Lambda function uses [AWS Lambda Powertools](https://docs.powertools.aws.dev/lambda/python/latest/) extensively — see the [Lambda Powertools features](#lambda-powertools-features) section below for details. Note that Powertools Tracer currently depends on the `aws-xray-sdk`, which is approaching deprecation. There is an [open RFC](https://github.com/aws-powertools/powertools-lambda/discussions/90) to replace it with OpenTelemetry as the tracing provider. You can update the stack to add AWS resources through the same deployment process that updates your application code.
 
 ## Lambda Powertools features
 
@@ -120,6 +127,8 @@ make test
 
 No AWS credentials or deployed stack required — unit tests mock all external dependencies.
 
+If you open the project in VS Code, the `.vscode/` directory pre-configures ruff (format on save), mypy, pylint, and pytest against `pyproject.toml`. The first time you open it, VS Code will prompt you to install the recommended extensions listed in `.vscode/extensions.json`.
+
 ## Makefile
 
 Common commands are available via `make`. Run `make help` to see all targets:
@@ -143,6 +152,7 @@ make clean          # remove build artifacts, caches, and coverage files
 
 To use the CDK, you need the following tools.
 
+* [Node.js](https://nodejs.org/) - Required to install the CDK CLI (`npm install -g aws-cdk`)
 * AWS CDK CLI - [Install the CDK CLI](https://docs.aws.amazon.com/cdk/v2/guide/getting-started.html)
 * AWS SAM CLI - [Install the SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html) - Required for local invocation and log tailing
 * [Python 3 installed](https://www.python.org/downloads/)
@@ -284,7 +294,7 @@ This works for any AWS Lambda function, not just ones deployed with SAM. See the
 
 ## Add a resource to your application
 
-To add AWS resources, define new constructs in `hello_world/hello_world_stack.py`. The CDK provides high-level constructs for most AWS services. Browse available constructs in the [AWS CDK API Reference](https://docs.aws.amazon.com/cdk/api/v2/python/). For resources without a dedicated CDK construct, you can use [CloudFormation resource types](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-template-resource-type-ref.html) directly via `CfnResource`.
+To add AWS resources, define new constructs in the appropriate stack file under `hello_world/`: backend resources (Lambda, API Gateway, DynamoDB, SSM, AppConfig) belong in `hello_world_stack.py`, frontend resources (S3, CloudFront) belong in `hello_world_frontend_stack.py`, and WAF rules belong in `hello_world_waf_stack.py`. The CDK provides high-level constructs for most AWS services. Browse available constructs in the [AWS CDK API Reference](https://docs.aws.amazon.com/cdk/api/v2/python/). For resources without a dedicated CDK construct, you can use [CloudFormation resource types](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-template-resource-type-ref.html) directly via `CfnResource`.
 
 ## Tests
 
@@ -486,7 +496,7 @@ Structural complexity thresholds. Pylint fails if any function or class exceeds 
 | Threshold | Value | What it limits |
 |---|---|---|
 | `max-args` | 8 | Parameters per function |
-| `max-locals` | 20 | Local variables per function |
+| `max-locals` | 25 | Local variables per function |
 | `max-returns` | 6 | Return statements per function |
 | `max-branches` | 12 | Branches (if/for/while/try) per function |
 | `max-statements` | 50 | Statements per function body |
@@ -558,7 +568,7 @@ pre-commit run --all-files
 |---|---|---|
 | `ruff` | astral-sh/ruff-pre-commit | Lints and auto-fixes code (runs before formatting) |
 | `ruff-format` | astral-sh/ruff-pre-commit | Formats code (equivalent to black) |
-| `mypy` | mirrors-mypy | Static type checking on `hello_world/` (excludes `app.py` and `tests/`) |
+| `mypy` | mirrors-mypy | Static type checking on `lambda/` and `hello_world/` (excludes `app.py` and `tests/`) |
 | `bandit` | PyCQA/bandit | Security-focused static analysis on `lambda/` and `hello_world/` |
 | `pylint` | local | Design and complexity checks on non-test, non-docs Python files |
 | `trailing-whitespace` | pre-commit-hooks | Removes trailing whitespace |
@@ -730,6 +740,8 @@ This is entirely transparent — you pass `waf.web_acl_arn` in `app.py` just lik
 
 The backend exposes `api_url` as a stack property. The frontend stack injects it into `config.json` at deploy time via `BucketDeployment`. The browser fetches `/config.json` at runtime so the API URL is never hardcoded in source.
 
+The static assets themselves live in the `frontend/` directory at the project root. Currently this is just a single `index.html` that fetches `config.json` and calls the API — replace it with a built SPA bundle (e.g. the `dist/` output from a Vite or Next.js export build) and the existing `BucketDeployment` will pick it up automatically.
+
 ### S3 bucket
 
 The bucket is fully private — no public access of any kind. CloudFront reaches it exclusively via [Origin Access Control (OAC)](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html), the current AWS-recommended successor to OAI. The bucket is encrypted with SSE-KMS (customer-managed key with annual rotation), has SSL enforced, server access logging enabled to a dedicated log bucket, versioning disabled (git is the source of truth), and `auto_delete_objects=True` so `cdk destroy` empties and deletes it cleanly.
@@ -777,7 +789,7 @@ The stack includes a [cdk-monitoring-constructs](https://github.com/cdklabs/cdk-
 
 ## Documentation
 
-Project documentation is generated from docstrings and markdown files using Sphinx with MyST-Parser. Source files are in `docs/`. All four modules are documented: `lambda/app.py` (Lambda handler), `hello_world/hello_world_stack.py` (backend), `hello_world/hello_world_waf_stack.py` (WAF), `hello_world/hello_world_frontend_stack.py` (frontend), and `hello_world/nag_utils.py` (shared suppression utilities). Doc builds are best run in CI/CD pipelines or manually before publishing, rather than on every commit.
+Project documentation is generated from docstrings and markdown files using Sphinx with MyST-Parser. Source files are in `docs/`. All five modules are documented: `lambda/app.py` (Lambda handler), `hello_world/hello_world_stack.py` (backend), `hello_world/hello_world_waf_stack.py` (WAF), `hello_world/hello_world_frontend_stack.py` (frontend), and `hello_world/nag_utils.py` (shared suppression utilities). Doc builds are best run in CI/CD pipelines or manually before publishing, rather than on every commit.
 
 ```bash
 # Build HTML docs
@@ -877,7 +889,7 @@ pip install -r tests/requirements.txt -r lambda/requirements.txt
 
 **attrs version conflict** — `requirements.txt` (dev) pins `attrs==25.4.0` for CDK compatibility, while `lambda/requirements.txt` pins `attrs==26.1.0` for Powertools. These two versions cannot coexist in a single environment. This is why the CI is split into separate `quality` and `test` jobs, and why local test deps are installed with `pip install -r` (additive) rather than `pip-sync` (destructive).
 
-**SSM parameter path is hardcoded** — the greeting parameter is stored at `/HelloWorld/greeting` in SSM, matching the stack name. This is intentional for a reference project but would be parameterised in a production stack.
+**SSM parameter path is derived from the stack name** — the greeting parameter is stored at `/{stack_name}/greeting` in SSM (e.g. `/HelloWorld-us-east-1/greeting`), so each regional deployment gets its own parameter automatically. This is intentional for a reference project but would likely be parameterised differently in a production stack.
 
 **CORS is open (`allow_origin="*"`)** — the Lambda handler configures `APIGatewayRestResolver` with `CORSConfig(allow_origin="*")` for simplicity. In production, restrict this to the specific CloudFront domain (e.g., `allow_origin="https://d1234.cloudfront.net"`) and set `allow_credentials=True` if the API requires cookies or Authorization headers. Leaving CORS open in production allows any origin to call the API from a browser.
 
