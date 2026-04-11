@@ -6,11 +6,11 @@ automatically when the stack cannot be found, so the standard ``pytest`` run
 
 To run frontend integration tests explicitly:
 
-    AWS_SAM_FRONTEND_STACK_NAME=HelloWorldFrontend-us-east-1 pytest tests/integration/
+    AWS_FRONTEND_STACK_NAME=HelloWorldFrontend-us-east-1 pytest tests/integration/
 
 Override for a different region:
 
-    AWS_SAM_FRONTEND_STACK_NAME=HelloWorldFrontend-ap-southeast-1 pytest tests/integration/
+    AWS_FRONTEND_STACK_NAME=HelloWorldFrontend-ap-southeast-1 pytest tests/integration/
 """
 
 import os
@@ -28,10 +28,10 @@ class TestFrontend:
         Skips the test if the stack is not deployed rather than failing, so the
         test suite stays green in environments without a live deployment.
         """
-        stack_name = os.environ.get("AWS_SAM_FRONTEND_STACK_NAME")
+        stack_name = os.environ.get("AWS_FRONTEND_STACK_NAME")
 
         if stack_name is None:
-            pytest.skip("AWS_SAM_FRONTEND_STACK_NAME not set — skipping frontend integration tests")
+            pytest.skip("AWS_FRONTEND_STACK_NAME not set — skipping frontend integration tests")
 
         client = boto3.client("cloudformation")
 

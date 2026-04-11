@@ -331,16 +331,16 @@ python -m pytest tests/unit -v
 
 Two suites of integration tests verify the live deployment:
 
-**API Gateway** (`tests/integration/test_api_gateway.py`) — calls the live API Gateway endpoint and verifies the response body, content type headers, and response time (under 10 seconds, to account for Lambda cold starts with SSM and AppConfig initialization). The backend stack name is read from `AWS_SAM_STACK_NAME` in `pyproject.toml` (defaults to `HelloWorld-us-east-1`). Override for a different region:
+**API Gateway** (`tests/integration/test_api_gateway.py`) — calls the live API Gateway endpoint and verifies the response body, content type headers, and response time (under 10 seconds, to account for Lambda cold starts with SSM and AppConfig initialization). The backend stack name is read from `AWS_BACKEND_STACK_NAME` in `pyproject.toml` (defaults to `HelloWorld-us-east-1`). Override for a different region:
 
 ```bash
-AWS_SAM_STACK_NAME=HelloWorld-ap-southeast-1 pytest tests/integration/
+AWS_BACKEND_STACK_NAME=HelloWorld-ap-southeast-1 pytest tests/integration/
 ```
 
-**CloudFront / S3** (`tests/integration/test_frontend.py`) — fetches the CloudFront distribution URL from the frontend stack outputs and verifies that the index page is served, `config.json` contains the injected API URL, HTTPS is enforced, security headers are present, and unknown paths fall back to `index.html` (SPA routing). The frontend stack name is read from `AWS_SAM_FRONTEND_STACK_NAME` in `pyproject.toml` (defaults to `HelloWorldFrontend-us-east-1`). Override for a different region:
+**CloudFront / S3** (`tests/integration/test_frontend.py`) — fetches the CloudFront distribution URL from the frontend stack outputs and verifies that the index page is served, `config.json` contains the injected API URL, HTTPS is enforced, security headers are present, and unknown paths fall back to `index.html` (SPA routing). The frontend stack name is read from `AWS_FRONTEND_STACK_NAME` in `pyproject.toml` (defaults to `HelloWorldFrontend-us-east-1`). Override for a different region:
 
 ```bash
-AWS_SAM_FRONTEND_STACK_NAME=HelloWorldFrontend-ap-southeast-1 pytest tests/integration/
+AWS_FRONTEND_STACK_NAME=HelloWorldFrontend-ap-southeast-1 pytest tests/integration/
 ```
 
 If either stack is not deployed, its tests skip automatically rather than failing — so the default `pytest` run stays green without a live deployment. Other test environment variables are configured in `pyproject.toml` via pytest-env (see the `env` key under `[tool.pytest.ini_options]`).
@@ -1005,7 +1005,7 @@ pip install -r tests/requirements.txt -r lambda/requirements.txt
 | Library | Purpose |
 |---|---|
 | `pytest` | Test framework |
-| `pytest-env` | Sets environment variables in `pyproject.toml` (e.g. `AWS_SAM_STACK_NAME`) |
+| `pytest-env` | Sets environment variables in `pyproject.toml` (e.g. `AWS_BACKEND_STACK_NAME`) |
 | `pytest-cov` | Code coverage reporting |
 | `pytest-xdist` | Parallel test execution with `-n auto` |
 | `pytest-mock` | Provides `mocker` fixture for mocking (used for Lambda context in unit tests) |

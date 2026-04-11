@@ -6,10 +6,10 @@ without a live deployment. To run integration tests explicitly:
 
     pytest tests/integration/ -c region=us-east-1
 
-The stack name is read from the ``AWS_SAM_STACK_NAME`` environment variable
+The stack name is read from the ``AWS_BACKEND_STACK_NAME`` environment variable
 (set in pyproject.toml). Override it for a different region:
 
-    AWS_SAM_STACK_NAME=HelloWorld-ap-southeast-1 pytest tests/integration/
+    AWS_BACKEND_STACK_NAME=HelloWorld-ap-southeast-1 pytest tests/integration/
 """
 
 import os
@@ -27,10 +27,10 @@ class TestApiGateway:
         Skips the test if the stack is not deployed rather than failing, so
         the test suite stays green in environments without a live deployment.
         """
-        stack_name = os.environ.get("AWS_SAM_STACK_NAME")
+        stack_name = os.environ.get("AWS_BACKEND_STACK_NAME")
 
         if stack_name is None:
-            pytest.skip("AWS_SAM_STACK_NAME not set — skipping integration tests")
+            pytest.skip("AWS_BACKEND_STACK_NAME not set — skipping integration tests")
 
         client = boto3.client("cloudformation")
 
