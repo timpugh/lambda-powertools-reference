@@ -144,7 +144,7 @@ make security       # run bandit + pip-audit
 make docs           # build Sphinx HTML docs
 make docs-open      # build and open docs in browser
 make compile        # regenerate all lock files from .in sources
-make upgrade        # upgrade all dependencies to latest compatible versions
+make upgrade        # upgrade all dependencies (respects COOLDOWN_DAYS, default 7)
 make clean          # remove build artifacts, caches, and coverage files
 ```
 
@@ -633,7 +633,7 @@ Major updates (e.g. `actions/upload-artifact@v4 → @v7`) intentionally fall thr
 
 If CI fails on a Dependabot PR (any ecosystem), it stays open for investigation rather than merging.
 
-**Repo setting required for auto-merge to work.** GitHub repositories ship with GitHub Actions blocked from approving pull requests by default. Until this is changed, the `dependabot-auto-merge` workflow will fail with `GraphQL: GitHub Actions is not permitted to approve pull requests` and even GitHub Actions PRs must be merged manually. Enable it once under **Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests"**. This only needs to be done a single time per repo.
+**Repo setting required for auto-merge to work.** GitHub repositories ship with GitHub Actions blocked from approving pull requests by default. Until this is changed, the `dependabot-auto-merge` workflow will fail with `GraphQL: GitHub Actions is not permitted to approve pull requests` and even GitHub Actions PRs must be merged manually. Enable it once under **Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests"**. This only needs to be done a single time per repo. Leave the **Workflow permissions** radio set to **Read repository contents and packages permissions** (the safer default) — every workflow in this repo declares its own explicit `permissions:` block, so the elevated `Read and write permissions` default is not needed. See "Least-privilege workflow permissions" in the supply-chain hardening section below.
 
 #### Python (`pip`) updates and the pip-tools constraint chain
 
@@ -696,7 +696,7 @@ We intentionally leave the downstream-recompile step manual rather than automati
 
 #### Supply-chain hardening
 
-The Dependabot setup layers four defenses against the supply-chain attack patterns described in GitGuardian's [*Renovate & Dependabot: the new malware delivery system*](https://blog.gitguardian.com/renovate-dependabot-the-new-malware-delivery-system/):
+This repo layers six defenses against the supply-chain attack patterns described in GitGuardian's [*Renovate & Dependabot: the new malware delivery system*](https://blog.gitguardian.com/renovate-dependabot-the-new-malware-delivery-system/):
 
 **1. Release cooldown.** Every ecosystem in `dependabot.yml` carries a `cooldown:` block that makes Dependabot wait a few days after a release before opening a PR. Fresh releases are the window in which malicious versions (tag hijacks, compromised maintainer accounts, typo-squats, the `xz-utils`/`nx`/`tj-actions/changed-files` class of incidents) typically get caught and yanked. The tiered schedule is 3 days for patches, 7 for minors, 14 for majors — larger jumps wait longer to let bugs surface.
 
@@ -713,6 +713,8 @@ Tag references are mutable — a compromised maintainer account can rewrite `v6`
 **4. Restricted auto-merge.** Auto-merge is scoped to patch and minor GitHub Actions updates only (see above). pip updates never auto-merge, regardless of the update type, because they ship to production Lambda. Majors in either ecosystem require human review.
 
 **5. Local pip cooldown on `make upgrade`.** Dependabot's cooldown protects every dependency change that lands via a PR, but `make upgrade` runs locally on a developer laptop and bypasses Dependabot entirely. The Makefile mirrors the same defense by passing pip's `--uploaded-prior-to` flag to `pip-compile --upgrade`, filtering out any package version uploaded in the last `COOLDOWN_DAYS` days (default 7). Override at the command line if you need to pull a fresher version: `make upgrade COOLDOWN_DAYS=1`. The cooldown is intentionally **only** applied to `upgrade`, not `compile`. `compile` reproduces decisions already encoded in the `.in` files and the existing lockfile — it cannot introduce a brand-new version, so cooldown is unnecessary and would actively conflict with freshly-bumped pins. `upgrade` is the only target where new versions enter the project and is the only place a fresh malicious release can land. Disable entirely with `COOLDOWN_DAYS=0`.
+
+**6. Least-privilege workflow permissions.** Every workflow under `.github/workflows/` declares an explicit `permissions:` block scoped to exactly what it needs, and the repo-level default (`Settings → Actions → General → Workflow permissions`) is set to `read` rather than `write`. The combination means that if a malicious dependency runs inside a CI job, the `GITHUB_TOKEN` it sees has the minimum authority necessary — `ci.yml`, `dependency-audit.yml`, and `docs.yml`'s `build` job all run with `contents: read` and nothing else. Only two places escalate beyond read: `docs.yml`'s `deploy` job adds `pages: write` + `id-token: write` for GitHub Pages OIDC deployment, and `dependabot-auto-merge.yml` adds `contents: write` + `pull-requests: write` so it can approve and merge Dependabot PRs (and is gated on `github.actor == 'dependabot[bot]'` plus a patch/minor update-type check). Permissions are declared at the **job** level wherever a workflow has heterogeneous needs (docs.yml's build vs deploy) and at the **workflow** level otherwise. The repo-level `read` default acts as defense-in-depth: if any future workflow is added without an explicit `permissions:` block, it inherits `read` instead of write-everything. The repo separately keeps `can_approve_pull_request_reviews` enabled — that toggle is independent of the default and is required for the auto-merge workflow's `gh pr review --approve` call to succeed.
 
 **What's intentionally not implemented: honeytokens.** The article also recommends honeytokens as a detection layer, which this repo deliberately skips. A honeytoken is a fake credential — typically an AWS access key or GitHub token that looks completely real but is registered with a canary service (Thinkst, GitGuardian, AWS canarytokens.org). Nothing legitimate ever authenticates with it, so any use is by definition either an attacker or a misconfigured script that shouldn't exist. When someone tries it, the canary service alerts the owner with the timestamp, source IP, and which specific token fired — that last detail reveals *where* the attacker read it from (CI logs, a specific repo clone, a leaked `.env`, etc.), which makes incident scoping much faster.
 
@@ -948,11 +950,16 @@ pip-compile --generate-hashes --allow-unsafe requirements.in -o requirements.txt
 To upgrade all dependencies:
 
 ```bash
-pip-compile --upgrade --generate-hashes lambda/requirements.in -o lambda/requirements.txt
-pip-compile --upgrade --generate-hashes --allow-unsafe tests/requirements.in -o tests/requirements.txt
-pip-compile --upgrade --generate-hashes --allow-unsafe requirements.in -o requirements.txt
-# Shortcut: make upgrade
+# Default: blocks any version uploaded to PyPI in the last 7 days (cooldown defense)
+make upgrade
+
+# Override the cooldown window
+make upgrade COOLDOWN_DAYS=14   # stricter — only versions older than 14 days
+make upgrade COOLDOWN_DAYS=1    # near-immediate — only the last 24 hours filtered
+make upgrade COOLDOWN_DAYS=0    # disable cooldown entirely
 ```
+
+`make upgrade` passes pip's `--uploaded-prior-to` flag to `pip-compile --upgrade` so brand-new PyPI releases (the window in which malicious versions typically get caught and yanked) are not pulled into the lockfiles. See "Local pip cooldown on `make upgrade`" in the supply-chain hardening section for the full rationale.
 
 To install and keep your venv in sync with dev dependencies:
 
