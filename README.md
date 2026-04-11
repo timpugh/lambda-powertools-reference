@@ -630,6 +630,8 @@ For GitHub Actions, the `dependabot-auto-merge` workflow:
 
 If CI fails on a Dependabot PR (any ecosystem), it stays open for investigation rather than merging.
 
+**Repo setting required for auto-merge to work.** GitHub repositories ship with GitHub Actions blocked from approving pull requests by default. Until this is changed, the `dependabot-auto-merge` workflow will fail with `GraphQL: GitHub Actions is not permitted to approve pull requests` and even GitHub Actions PRs must be merged manually. Enable it once under **Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests"**. This only needs to be done a single time per repo.
+
 #### Python (`pip`) updates and the pip-tools constraint chain
 
 The three Python requirements tiers are chained together via `pip-compile` constraint files:
@@ -646,7 +648,9 @@ When a package shared across tiers changes version, all downstream lock files mu
 
 **Dependabot handles each directory independently** and does not automatically re-run the downstream compiles. If Dependabot bumps a package in `lambda/requirements.in`, it regenerates `lambda/requirements.txt` correctly — but `tests/requirements.txt` and `requirements.txt` may still reference stale pins from the old lambda file. In practice, this only matters when the bumped package appears in the transitive tree of the downstream tiers.
 
-**The manual fix takes about 30 seconds:**
+**Case 1 — single package confined to one tier.** When a Dependabot PR bumps a package that only appears in one directory (e.g. `ruff` in `/`, `pytest` in `/tests`), merging it directly is enough — nothing downstream depends on it. These PRs go green on CI and can be squash-merged as-is.
+
+**Case 2 — a package that cascades down the chain.** When Dependabot bumps a package in `lambda/requirements.in` that is also transitively present in `tests/` or `/`, its PR regenerates only its own lock file — the downstream lock files still reference the stale pin. The 30-second fix is to recompile the downstream tiers locally:
 
 ```bash
 gh pr checkout <PR-number>
@@ -656,7 +660,32 @@ git commit -m "chore: recompile downstream lock files"
 git push
 ```
 
-CI will re-run against the fully-consistent state. We intentionally leave this step manual rather than automating it with a `pull_request_target` workflow: the manual path is ~30 seconds a few times a month, and a `pull_request_target` workflow that pushes back to PR branches carries a non-trivial security surface that is not worth the convenience trade-off for a solo reference project. If this repo ever takes external contributions, the calculus changes and the workflow becomes worth building.
+**Case 3 — cross-cutting packages that Dependabot splits across directories.** Packages like `boto3` and `botocore` live as top-level pins in both `lambda/requirements.in` and `tests/requirements.in`. Dependabot opens **one PR per directory** (e.g. `boto3` in lambda/, `botocore` in tests/), but `pip-sync tests/requirements.txt lambda/requirements.txt` in the CI test job refuses to install mismatched versions — so neither PR can land in isolation and both fail CI. `gh pr checkout` on either one doesn't fix the other.
+
+The fix is to land them atomically from a single local commit rather than through Dependabot PRs at all:
+
+```bash
+# Close the stuck Dependabot PRs (they cannot be rebased into a consistent state)
+gh pr close <boto3-PR> --comment "Superseded by local recompile"
+gh pr close <botocore-PR> --comment "Superseded by local recompile"
+
+# Bump the pin in each .in file, then recompile each tier in order
+# (editing lambda/requirements.in and tests/requirements.in to the new version)
+pip-compile --generate-hashes --upgrade-package boto3 --upgrade-package botocore \
+    lambda/requirements.in -o lambda/requirements.txt
+pip-compile --generate-hashes --allow-unsafe --upgrade-package boto3 --upgrade-package botocore \
+    tests/requirements.in -o tests/requirements.txt
+pip-compile --generate-hashes --allow-unsafe --upgrade-package boto3 --upgrade-package botocore \
+    requirements.in -o requirements.txt
+
+git add lambda/requirements.in lambda/requirements.txt tests/requirements.in tests/requirements.txt requirements.txt
+git commit -m "build(deps): bump boto3 and botocore across all three lockfiles"
+git push
+```
+
+**Useful Dependabot commands.** When a PR becomes stale relative to `main` (shown as `BEHIND` in `gh pr view`), comment `@dependabot rebase` on the PR to trigger a fresh rebase and CI run. Other useful commands include `@dependabot recreate` (regenerates the PR from scratch) and `@dependabot ignore this version` (skip a specific release). The full command list is at <https://docs.github.com/en/code-security/dependabot/working-with-dependabot/managing-pull-requests-for-dependency-updates>.
+
+We intentionally leave the downstream-recompile step manual rather than automating it with a `pull_request_target` workflow: the manual path is ~30 seconds a few times a month, and a `pull_request_target` workflow that pushes back to PR branches carries a non-trivial security surface that is not worth the convenience trade-off for a solo reference project. If this repo ever takes external contributions, the calculus changes and the workflow becomes worth building.
 
 **`attrs` is pinned and ignored.** The `attrs` package has an unresolvable version conflict between CDK (`25.4.0`) and Lambda Powertools (`26.1.0`). Dependabot is configured to ignore `attrs` in all three directories so it does not open unresolvable upgrade PRs — see the "attrs version conflict" note in Design decisions.
 
