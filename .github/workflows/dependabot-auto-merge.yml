@@ -16,8 +16,16 @@ jobs:
         id: metadata
         uses: dependabot/fetch-metadata@ffa630c65fa7e0ecfa0625b5ceda64399aea1b36  # v3.0.0
 
-      - name: Approve and auto-merge GitHub Actions updates
-        if: steps.metadata.outputs.package-ecosystem == 'github_actions'
+      # Auto-merge is restricted to patch and minor GitHub Actions bumps.
+      # Majors (v4 → v5) can contain breaking input/output changes and carry
+      # enough review surface to warrant a human look — same reasoning GitGuardian
+      # gives in 'Renovate & Dependabot: the new malware delivery system'.
+      # The update-type strings come from dependabot/fetch-metadata outputs.
+      - name: Approve and auto-merge patch/minor GitHub Actions updates
+        if: |
+          steps.metadata.outputs.package-ecosystem == 'github_actions' &&
+          (steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+           steps.metadata.outputs.update-type == 'version-update:semver-minor')
         run: |
           gh pr review --approve "$PR_URL"
           gh pr merge --auto --squash "$PR_URL"

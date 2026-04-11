@@ -620,13 +620,16 @@ Dependabot is configured in `.github/dependabot.yml` to check for updates every 
 
 | Ecosystem | What it checks | Auto-merge? |
 |-----------|----------------|-------------|
-| `github-actions` | Workflow YAML for newer action versions (e.g. `actions/checkout@v4` → `v5`) | Yes, via `dependabot-auto-merge` workflow once CI passes |
+| `github-actions` | Workflow YAML for newer action versions (e.g. `actions/checkout@v4` → `v5`) | Patch and minor updates auto-merge via the `dependabot-auto-merge` workflow once CI passes; major updates require human review |
 | `pip` | All three Python requirements tiers (`lambda/`, `tests/`, `/`) — regenerates lock files with hashes in place | No — pip PRs are held for human review |
 
-For GitHub Actions, the `dependabot-auto-merge` workflow:
+For GitHub Actions patch and minor updates, the `dependabot-auto-merge` workflow:
 1. Confirms the PR is a GitHub Actions ecosystem update
-2. Approves it
-3. Enables auto-merge — GitHub merges it automatically once CI passes
+2. Checks that `dependabot/fetch-metadata` reports the update type as `version-update:semver-patch` or `version-update:semver-minor`
+3. Approves the PR
+4. Enables auto-merge — GitHub merges it automatically once CI passes
+
+Major updates (e.g. `actions/upload-artifact@v4 → @v7`) intentionally fall through to manual review because they can contain breaking input/output changes and warrant a human glance at the changelog.
 
 If CI fails on a Dependabot PR (any ecosystem), it stays open for investigation rather than merging.
 
@@ -690,6 +693,26 @@ git push
 We intentionally leave the downstream-recompile step manual rather than automating it with a `pull_request_target` workflow: the manual path is ~30 seconds a few times a month, and a `pull_request_target` workflow that pushes back to PR branches carries a non-trivial security surface that is not worth the convenience trade-off for a solo reference project. If this repo ever takes external contributions, the calculus changes and the workflow becomes worth building.
 
 **`attrs` is pinned and ignored.** The `attrs` package has an unresolvable version conflict between CDK (`25.4.0`) and Lambda Powertools (`26.1.0`). Dependabot is configured to ignore `attrs` in all three directories so it does not open unresolvable upgrade PRs — see the "attrs version conflict" note in Design decisions.
+
+#### Supply-chain hardening
+
+The Dependabot setup layers four defenses against the supply-chain attack patterns described in GitGuardian's [*Renovate & Dependabot: the new malware delivery system*](https://blog.gitguardian.com/renovate-dependabot-the-new-malware-delivery-system/):
+
+**1. Release cooldown.** Every ecosystem in `dependabot.yml` carries a `cooldown:` block that makes Dependabot wait a few days after a release before opening a PR. Fresh releases are the window in which malicious versions (tag hijacks, compromised maintainer accounts, typo-squats, the `xz-utils`/`nx`/`tj-actions/changed-files` class of incidents) typically get caught and yanked. The tiered schedule is 3 days for patches, 7 for minors, 14 for majors — larger jumps wait longer to let bugs surface.
+
+**2. SHA-pinned GitHub Actions.** Every `uses:` reference in `.github/workflows/` is pinned to a 40-character commit SHA with the version in a trailing comment:
+
+```yaml
+- uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+```
+
+Tag references are mutable — a compromised maintainer account can rewrite `v6` to point at malicious code, and every workflow that said `@v6` instantly runs the malicious version on the next trigger. This is exactly what happened to `tj-actions/changed-files` in March 2025, where attackers rewrote the `v35` and `v38` tags to exfiltrate CI secrets from thousands of repos within an hour. SHA pins are immutable — a re-tagged release becomes a new commit, and our pin simply ignores it until a human updates it. Dependabot still opens update PRs for SHA-pinned actions; the diff replaces both the SHA and the version comment in one shot.
+
+**3. Hash-locked pip installs.** All three lock files are generated with `pip-compile --generate-hashes`, so every dependency is pinned to a SHA256. Even if an attacker uploads a malicious version under an existing version number (e.g. after yanking the legitimate one), `pip install` refuses to install it because the hash does not match.
+
+**4. Restricted auto-merge.** Auto-merge is scoped to patch and minor GitHub Actions updates only (see above). pip updates never auto-merge, regardless of the update type, because they ship to production Lambda. Majors in either ecosystem require human review.
+
+The primary defense layer the article recommends that this repo does not implement is **honeytokens** — planting fake AWS credentials in code or config that raise alerts when used. For a solo reference project the operational overhead of wiring up alerting is not worth it, but for a production repo with real secrets in play it is worth adding (GitGuardian's free `ggshield` CLI ships a honeytoken generator).
 
 #### Why not Renovate?
 
