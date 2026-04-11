@@ -75,16 +75,29 @@ docs-open: docs ## Build and open documentation in browser
 # =============================================================================
 # Dependency management
 # =============================================================================
+#
+# COOLDOWN_DAYS gates `make upgrade` against PyPI versions uploaded in the last
+# N days. This is the local mirror of the Dependabot cooldown — it defends
+# laptop-side dependency upgrades against fresh malicious releases (xz-utils /
+# nx / tj-actions class incidents). The cooldown only applies to `upgrade`,
+# not `compile`: `compile` reproduces decisions already encoded in the .in
+# files and the existing lockfile, while `upgrade` is where brand-new versions
+# enter the project and is the only place a fresh malicious release can land.
+#
+# Override at the command line: `make upgrade COOLDOWN_DAYS=14`.
+COOLDOWN_DAYS ?= 7
+COOLDOWN_CUTOFF := $(shell python3 -c 'from datetime import datetime, timedelta, timezone; print((datetime.now(timezone.utc) - timedelta(days=$(COOLDOWN_DAYS))).strftime("%Y-%m-%dT00:00:00Z"))')
+COOLDOWN_PIP_ARGS := --pip-args "--uploaded-prior-to $(COOLDOWN_CUTOFF)"
 
 compile: ## Regenerate all lock files from .in sources (lambda -> tests -> dev)
 	pip-compile --generate-hashes lambda/requirements.in -o lambda/requirements.txt
 	pip-compile --generate-hashes --allow-unsafe tests/requirements.in -o tests/requirements.txt
 	pip-compile --generate-hashes --allow-unsafe requirements.in -o requirements.txt
 
-upgrade: ## Upgrade all dependencies to latest compatible versions
-	pip-compile --upgrade --generate-hashes lambda/requirements.in -o lambda/requirements.txt
-	pip-compile --upgrade --generate-hashes --allow-unsafe tests/requirements.in -o tests/requirements.txt
-	pip-compile --upgrade --generate-hashes --allow-unsafe requirements.in -o requirements.txt
+upgrade: ## Upgrade all dependencies to latest versions older than COOLDOWN_DAYS days
+	pip-compile --upgrade $(COOLDOWN_PIP_ARGS) --generate-hashes lambda/requirements.in -o lambda/requirements.txt
+	pip-compile --upgrade $(COOLDOWN_PIP_ARGS) --generate-hashes --allow-unsafe tests/requirements.in -o tests/requirements.txt
+	pip-compile --upgrade $(COOLDOWN_PIP_ARGS) --generate-hashes --allow-unsafe requirements.in -o requirements.txt
 
 # =============================================================================
 # Cleanup
