@@ -9,6 +9,16 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "America/New_York"
+    # Supply-chain safety: wait N days after a release before opening a PR.
+    # Fresh releases are the window in which malicious versions (tag-hijacks,
+    # compromised maintainer accounts, typo-squats) typically get caught and
+    # yanked. 3–7 days is generally enough to dodge the worst of it. Larger
+    # version jumps wait longer so major rewrites have time to surface bugs.
+    cooldown:
+      default-days: 5
+      semver-major-days: 14
+      semver-minor-days: 7
+      semver-patch-days: 3
 
   # Python — Lambda runtime dependencies (lambda/requirements.in → lambda/requirements.txt)
   # Dependabot auto-detects pip-compile mode from the lock file header and
@@ -25,6 +35,11 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "America/New_York"
+    cooldown:
+      default-days: 5
+      semver-major-days: 14
+      semver-minor-days: 7
+      semver-patch-days: 3
     ignore:
       # attrs is pinned at 26.1.0 for Powertools and cannot be upgraded without
       # breaking CDK (which requires 25.4.0). This is a documented, intentional
@@ -49,6 +64,11 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "America/New_York"
+    cooldown:
+      default-days: 5
+      semver-major-days: 14
+      semver-minor-days: 7
+      semver-patch-days: 3
     ignore:
       - dependency-name: "attrs"
     groups:
@@ -74,6 +94,11 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "America/New_York"
+    cooldown:
+      default-days: 5
+      semver-major-days: 14
+      semver-minor-days: 7
+      semver-patch-days: 3
     ignore:
       - dependency-name: "attrs"
     groups:
