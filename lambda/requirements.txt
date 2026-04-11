@@ -19,22 +19,22 @@ aws-encryption-sdk==4.0.4 \
 aws-lambda-powertools[all]==3.27.0 \
     --hash=sha256:3bd3c3bcd12ddd2d01b9ff2389c2b049bb0e182de017437500e175a4fa72cf5c \
     --hash=sha256:544dc90603f1dc98ec6f75c85b4b4b6b893a6c30af4a86ed1b8e08ec3c3be433
-    # via -r requirements.in
+    # via -r lambda/requirements.in
 aws-xray-sdk==2.15.0 \
     --hash=sha256:422d62ad7d52e373eebb90b642eb1bb24657afe03b22a8df4a8b2e5108e278a3 \
     --hash=sha256:794381b96e835314345068ae1dd3b9120bd8b4e21295066c37e8814dbb341365
     # via
-    #   -r requirements.in
+    #   -r lambda/requirements.in
     #   aws-lambda-powertools
-boto3==1.42.83 \
-    --hash=sha256:544846fdb10585bb7837e409868e8e04c6b372fa04479ba1597ce82cf1242076 \
-    --hash=sha256:cc5621e603982cb3145b7f6c9970e02e297a1a0eb94637cc7f7b69d3017640ee
+boto3==1.42.87 \
+    --hash=sha256:15cc1404b3ccbcfe17bd5834d467b1b28d53d9aca44e3798dc44876ac57362e6 \
+    --hash=sha256:b5b86a826f8f12c7d38679f35bd0135807a6867a21eb8be6dea7c27aeb14ec14
     # via
-    #   -r requirements.in
+    #   -r lambda/requirements.in
     #   aws-encryption-sdk
-botocore==1.42.83 \
-    --hash=sha256:34bc8cb64b17ac17f8901f073fe4fc9572a5cac9393a37b2b3ea372a83b87f4a \
-    --hash=sha256:ec0c3ecb3772936ed22a3bdda09883b34858933f71004686d460d829bab39d8e
+botocore==1.42.88 \
+    --hash=sha256:032375b213305b6b81eedb269eaeefdf96f674620799bbf96117dca86052cc1a \
+    --hash=sha256:cbb59ee464662039b0c2c95a520cdf85b1e8ce00b72375ab9cd9f842cc001301
     # via
     #   aws-xray-sdk
     #   boto3
