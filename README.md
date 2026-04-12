@@ -600,6 +600,8 @@ pre-commit run --all-files
 | `xenon` | local | Enforces cyclomatic complexity thresholds on `lambda/` (max absolute: B, module: A, average: A) |
 | `pip-audit` | local | Scans all installed dependencies for known CVEs (runs on every commit) |
 
+**Version pinning.** The `ruff` and `mypy` hooks are pinned to specific versions in `.pre-commit-config.yaml` (`rev:` for ruff, `additional_dependencies:` for mypy's `boto3-stubs` and `aws-cdk-lib`). These pins must stay in sync with the corresponding versions in `requirements.in` — if Dependabot bumps ruff or boto3-stubs in the lockfile, update `.pre-commit-config.yaml` to match. A version mismatch means pre-commit and the local venv would run different tool versions, which can cause "passes locally, fails in CI" drift.
+
 ## GitHub Actions
 
 Four workflows are configured:
@@ -810,6 +812,29 @@ Current suppressions across all stacks:
 | `NIST.800.53.R5-S3DefaultEncryptionKMS` | Frontend | Resource (log bucket only) | S3 log delivery service does not support KMS target buckets; SSE-S3 required |
 
 Rules that were previously suppressed and have since been implemented are removed from this list. If you add a suppression, include a clear `reason` and consider whether the finding represents a genuine gap worth addressing in production.
+
+### CDK context flags (`cdk.json`)
+
+CDK uses context flags to opt into newer behaviors that would otherwise be breaking changes. Each flag controls a specific aspect of how CDK generates CloudFormation templates. The `cdk.json` context block is divided into three groups:
+
+**Original flags (from project creation):** `@aws-cdk/aws-lambda:recognizeLayerVersion`, `@aws-cdk/core:checkSecretUsage`, and `@aws-cdk/core:target-partitions`. These shipped with the CDK Python template and have been active since the first deploy.
+
+**Safe flags (added later, zero template drift):** 12 additional flags that CDK 2.248.0 recommends but that produce no CloudFormation changes against the deployed stacks. These were validated by running `cdk diff --all` with each flag enabled — zero diffs across all three stacks. They cover improved validation, metadata collection, unique resource naming, and scoped KMS/DynamoDB/Lambda/CloudFront/API Gateway behaviors.
+
+**Deferred flags (require a planned deploy):** 8 flags that produce real CloudFormation mutations when enabled. Each is documented in `cdk.json` with the flag name, a description, and the number of template changes it would produce. These should be enabled together in a single maintenance window followed by `cdk deploy --all` and integration tests. The notable ones:
+
+| Flag | Changes | Why it's deferred |
+|---|---|---|
+| `@aws-cdk/core:enablePartitionLiterals` | 41 | Hardcodes partition ARNs — 2 Lambda Permission replacements cause a brief API Gateway invoke gap |
+| `@aws-cdk/aws-iam:minimizePolicies` | 103 | Aggressively restructures all IAM policies — new cdk-nag errors require suppression additions |
+| `@aws-cdk/aws-s3:serverAccessLogsUseBucketPolicy` | 9 | Migrates access log bucket from ACL to bucket policy |
+| `@aws-cdk/aws-lambda:createNewPoliciesWithAddToRolePolicy` | 2 | Restructures Lambda IAM policies — triggers new cdk-nag errors |
+| `@aws-cdk/aws-apigateway:disableCloudWatchRole` | 3 | Removes account-level CloudWatch role for API Gateway |
+| `@aws-cdk/aws-s3:createDefaultLoggingPolicy` | 3 | Adds default logging policy to S3 buckets |
+| `@aws-cdk/aws-s3:publicAccessBlockedByDefault` | 3 | Adds explicit public access block |
+| `@aws-cdk/custom-resources:logApiResponseDataPropertyTrueDefault` | 6 | Changes custom resource config, may cause replacement |
+
+To enable the deferred flags: uncomment them in `cdk.json` (remove the `_deferred_` prefix), run `cdk diff --all` to review, add any new cdk-nag suppressions, then `cdk deploy --all`. Run integration tests afterward to confirm no regressions.
 
 ## Frontend stack
 
