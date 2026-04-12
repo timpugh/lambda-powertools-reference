@@ -1,7 +1,7 @@
 # Lambda Powertools Reference
 
 [![CI](https://github.com/timpugh/lambda-powertools-reference/actions/workflows/ci.yml/badge.svg)](https://github.com/timpugh/lambda-powertools-reference/actions/workflows/ci.yml)
-[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/downloads/)
 [![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://timpugh.github.io/lambda-powertools-reference/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
@@ -789,7 +789,7 @@ Current suppressions across all stacks:
 | `AwsSolutions-COG4` | Backend | Stack | No Cognito authorizer — same as APIG4 |
 | `AwsSolutions-IAM4` | Backend, Frontend | Per-resource (CDK singletons + HelloWorldFunction) | CDK-managed Lambda roles use AWS managed policies; not configurable by the caller |
 | `AwsSolutions-IAM5` | Backend, Frontend, WAF | Per-resource (with `applies_to`) | Wildcard permissions scoped to specific actions — X-Ray, KMS `GenerateDataKey*`/`ReEncrypt*`, CDK custom resource `Resource::*` |
-| `AwsSolutions-L1` | Backend, Frontend | Per-resource (CDK singletons) | CDK-managed Lambda runtimes are not configurable; `HelloWorldFunction` is pinned to Python 3.12 |
+| `AwsSolutions-L1` | Backend, Frontend | Per-resource (CDK singletons) | CDK-managed Lambda runtimes are not configurable; `HelloWorldFunction` uses Python 3.13 (latest) but cdk-nag rule not yet updated |
 | `AwsSolutions-S1` | Frontend | Resource (log bucket) | The access log bucket itself — logging to itself would be circular |
 | `AwsSolutions-CFR1/3` | Frontend | Stack | CloudFront access logging not enabled for sample app |
 | `AwsSolutions-CFR4` | Frontend | Stack | Default CloudFront certificate — no custom domain for sample app |

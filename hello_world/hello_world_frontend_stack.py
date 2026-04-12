@@ -268,7 +268,7 @@ class HelloWorldFrontendStack(Stack):
             self,
             [
                 # ── AWS Solutions ────────────────────────────────────────────────
-                {"id": "AwsSolutions-CFR1", "reason": "CloudFront access logging not enabled for sample app"},
+                {"id": "AwsSolutions-CFR1", "reason": "Geo restriction not required for sample app"},
                 {"id": "AwsSolutions-CFR3", "reason": "CloudFront access logging not enabled for sample app"},
                 {
                     "id": "AwsSolutions-CFR4",

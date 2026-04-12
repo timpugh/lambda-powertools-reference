@@ -174,7 +174,7 @@ class HelloWorldStack(Stack):
         hello_fn = PythonFunction(
             self,
             "HelloWorldFunction",
-            runtime=_lambda.Runtime.PYTHON_3_12,
+            runtime=_lambda.Runtime.PYTHON_3_13,
             entry="lambda",
             index="app.py",
             handler="lambda_handler",
@@ -402,8 +402,15 @@ class HelloWorldStack(Stack):
         NagSuppressions.add_resource_suppressions(
             hello_fn,
             [
-                {"id": "AwsSolutions-L1", "reason": "Runtime intentionally pinned to Python 3.12"},
-                {"id": "Serverless-LambdaLatestVersion", "reason": "Runtime intentionally pinned to Python 3.12"},
+                # cdk-nag has not updated its rule to recognize Python 3.13 as the latest Lambda runtime
+                {
+                    "id": "AwsSolutions-L1",
+                    "reason": "Python 3.13 is the latest Lambda runtime — cdk-nag rule not yet updated",
+                },
+                {
+                    "id": "Serverless-LambdaLatestVersion",
+                    "reason": "Python 3.13 is the latest Lambda runtime — cdk-nag rule not yet updated",
+                },
                 {
                     "id": "Serverless-LambdaDLQ",
                     "reason": "Invoked synchronously via API Gateway — async DLQ pattern does not apply",
