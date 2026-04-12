@@ -244,21 +244,30 @@ class HelloWorldStack(Stack):
                 },
                 access_log_destination=apigw.LogGroupLogDestination(api_log_group),
                 access_log_format=apigw.AccessLogFormat.custom(
-                    '{"requestId":"$context.requestId",'
-                    '"accountId":"$context.accountId",'
-                    '"apiId":"$context.apiId",'
-                    '"stage":"$context.stage",'
-                    '"resourcePath":"$context.resourcePath",'
-                    '"httpMethod":"$context.httpMethod",'
-                    '"protocol":"$context.protocol",'
-                    '"status":"$context.status",'
-                    '"responseType":"$context.error.responseType",'
-                    '"errorMessage":"$context.error.message",'
-                    '"requestTime":"$context.requestTime",'
-                    '"ip":"$context.identity.sourceIp",'
-                    '"caller":"$context.identity.caller",'
-                    '"user":"$context.identity.user",'
-                    '"responseLength":"$context.responseLength"}'
+                    # Built from typed AccessLogField references — json_with_standard_fields
+                    # only supports 10 fixed fields; custom() is the CDK API for extended formats.
+                    "{"
+                    + ",".join(
+                        [
+                            f'"requestId":"{apigw.AccessLogField.context_request_id()}"',
+                            f'"accountId":"{apigw.AccessLogField.context_owner_account_id()}"',
+                            f'"apiId":"{apigw.AccessLogField.context_api_id()}"',
+                            f'"stage":"{apigw.AccessLogField.context_stage()}"',
+                            f'"resourcePath":"{apigw.AccessLogField.context_resource_path()}"',
+                            f'"httpMethod":"{apigw.AccessLogField.context_http_method()}"',
+                            f'"protocol":"{apigw.AccessLogField.context_protocol()}"',
+                            f'"status":"{apigw.AccessLogField.context_status()}"',
+                            f'"responseType":"{apigw.AccessLogField.context_error_response_type()}"',
+                            f'"errorMessage":"{apigw.AccessLogField.context_error_message()}"',
+                            f'"requestTime":"{apigw.AccessLogField.context_request_time()}"',
+                            f'"ip":"{apigw.AccessLogField.context_identity_source_ip()}"',
+                            f'"caller":"{apigw.AccessLogField.context_identity_caller()}"',
+                            f'"user":"{apigw.AccessLogField.context_identity_user()}"',
+                            f'"responseLength":"{apigw.AccessLogField.context_response_length()}"',
+                            f'"xrayTraceId":"{apigw.AccessLogField.context_xray_trace_id()}"',
+                        ]
+                    )
+                    + "}"
                 ),
                 logging_level=apigw.MethodLoggingLevel.INFO,
                 data_trace_enabled=False,
