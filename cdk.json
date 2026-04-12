@@ -38,9 +38,9 @@
     "@aws-cdk/aws-s3:publicAccessBlockedByDefault": true,
     "@aws-cdk/custom-resources:logApiResponseDataPropertyTrueDefault": false,
 
-    "_comment_deferred_flags": "These flags trigger new cdk-nag errors requiring suppression additions. Enable together when ready to update IAM policy structure.",
-    "_deferred_@aws-cdk/aws-lambda:createNewPoliciesWithAddToRolePolicy": "Restructures Lambda IAM policies — triggers new cdk-nag errors requiring suppressions (2 changes)",
-    "_deferred_@aws-cdk/aws-iam:minimizePolicies": "Aggressively restructures all IAM policies — 103 changes and new cdk-nag errors",
+    "_comment_iam_flags": "These flags restructure IAM policies for least-privilege. Enabled together to minimize deploy churn.",
+    "@aws-cdk/aws-lambda:createNewPoliciesWithAddToRolePolicy": true,
+    "@aws-cdk/aws-iam:minimizePolicies": true,
     "_skipped_@aws-cdk/aws-apigateway:disableCloudWatchRole": "Incompatible with NIST 800-53 R5 — execution logging (APIG6 / APIGWExecutionLoggingEnabled) requires the account-level CloudWatch role"
   }
 }

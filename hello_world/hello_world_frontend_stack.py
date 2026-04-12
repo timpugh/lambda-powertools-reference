@@ -242,6 +242,14 @@ class HelloWorldFrontendStack(Stack):
             CDK_LAMBDA_SUPPRESSIONS,
             apply_to_children=True,
         )
+        # minimizePolicies restructures the BucketDeployment handler's inline
+        # policy into a separate resource under DeployFrontend/CustomResourceHandler
+        NagSuppressions.add_resource_suppressions_by_path(
+            self,
+            f"/{self.stack_name}/DeployFrontend/CustomResourceHandler",
+            CDK_LAMBDA_SUPPRESSIONS,
+            apply_to_children=True,
+        )
         NagSuppressions.add_resource_suppressions_by_path(
             self,
             f"/{self.stack_name}/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a",
