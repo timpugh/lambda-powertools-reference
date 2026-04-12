@@ -293,6 +293,8 @@ class HelloWorldStack(Stack):
             removal_policy=RemovalPolicy.DESTROY,
         )
 
+        self._create_insights_queries(lambda_log_group, api_log_group)
+
         # Application Insights
         resource_group = rg.CfnGroup(
             self,
@@ -542,4 +544,108 @@ class HelloWorldStack(Stack):
                     "reason": "AWS Backup plan not configured for sample app — PITR is enabled for point-in-time recovery",
                 },
             ],
+        )
+
+    def _create_insights_queries(self, lambda_log_group: logs.LogGroup, api_log_group: logs.LogGroup) -> None:
+        """Create CloudWatch Logs Insights saved queries for Lambda and API Gateway."""
+        # ── Lambda queries ────────────────────────────────────────────────────
+        logs.QueryDefinition(
+            self,
+            "LambdaRecentErrors",
+            query_definition_name=f"{self.stack_name}/Lambda/RecentErrors",
+            query_string=logs.QueryString(
+                fields=[
+                    "@timestamp",
+                    "level",
+                    "message",
+                    "xray_trace_id",
+                    "function_request_id",
+                    "exception",
+                    "exception_name",
+                ],
+                filter_statements=["level = 'ERROR'"],
+                sort="@timestamp desc",
+                limit=50,
+            ),
+            log_groups=[lambda_log_group],
+        )
+        logs.QueryDefinition(
+            self,
+            "LambdaColdStarts",
+            query_definition_name=f"{self.stack_name}/Lambda/ColdStarts",
+            query_string=logs.QueryString(
+                fields=["@timestamp", "function_name", "function_request_id", "xray_trace_id"],
+                filter_statements=["cold_start = true"],
+                sort="@timestamp desc",
+                limit=50,
+            ),
+            log_groups=[lambda_log_group],
+        )
+        logs.QueryDefinition(
+            self,
+            "LambdaSlowInvocations",
+            query_definition_name=f"{self.stack_name}/Lambda/SlowInvocations",
+            query_string=logs.QueryString(
+                fields=["@timestamp", "@duration", "function_request_id", "xray_trace_id", "message"],
+                filter_statements=["@duration > 3000"],
+                sort="@duration desc",
+                limit=50,
+            ),
+            log_groups=[lambda_log_group],
+        )
+
+        # ── API Gateway queries ───────────────────────────────────────────────
+        logs.QueryDefinition(
+            self,
+            "ApiGatewayErrors",
+            query_definition_name=f"{self.stack_name}/ApiGateway/4xx5xxErrors",
+            query_string=logs.QueryString(
+                fields=[
+                    "@timestamp",
+                    "status",
+                    "httpMethod",
+                    "resourcePath",
+                    "errorMessage",
+                    "responseType",
+                    "ip",
+                    "xrayTraceId",
+                    "requestId",
+                ],
+                filter_statements=["status >= 400"],
+                sort="@timestamp desc",
+                limit=50,
+            ),
+            log_groups=[api_log_group],
+        )
+        logs.QueryDefinition(
+            self,
+            "ApiGatewayRequestsByIp",
+            query_definition_name=f"{self.stack_name}/ApiGateway/RequestsByIP",
+            query_string=logs.QueryString(
+                fields=["ip"],
+                stats_statements=["count(*) as requestCount by ip"],
+                sort="requestCount desc",
+                limit=25,
+            ),
+            log_groups=[api_log_group],
+        )
+        logs.QueryDefinition(
+            self,
+            "ApiGatewayLatency",
+            query_definition_name=f"{self.stack_name}/ApiGateway/SlowestRequests",
+            query_string=logs.QueryString(
+                fields=[
+                    "@timestamp",
+                    "status",
+                    "httpMethod",
+                    "resourcePath",
+                    "responseLength",
+                    "ip",
+                    "xrayTraceId",
+                    "requestId",
+                ],
+                sort="@timestamp desc",
+                limit=50,
+            ),
+            log_groups=[api_log_group],
         )

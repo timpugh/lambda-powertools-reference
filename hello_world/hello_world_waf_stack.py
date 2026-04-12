@@ -175,6 +175,51 @@ class HelloWorldWafStack(Stack):
         # value automatically via SSM (cross_region_references=True on the consumer).
         self.web_acl_arn = web_acl.attr_arn
 
+        # ── CloudWatch Logs Insights saved queries ────────────────────────────
+        logs.QueryDefinition(
+            self,
+            "WafBlockedRequests",
+            query_definition_name=f"{self.stack_name}/WAF/BlockedRequests",
+            query_string=logs.QueryString(
+                fields=[
+                    "@timestamp",
+                    "action",
+                    "httpRequest.clientIp",
+                    "httpRequest.uri",
+                    "httpRequest.httpMethod",
+                    "httpRequest.country",
+                ],
+                filter_statements=["action = 'BLOCK'"],
+                sort="@timestamp desc",
+                limit=50,
+            ),
+            log_groups=[waf_log_group],
+        )
+        logs.QueryDefinition(
+            self,
+            "WafTopBlockedRules",
+            query_definition_name=f"{self.stack_name}/WAF/TopBlockedRules",
+            query_string=logs.QueryString(
+                filter_statements=["action = 'BLOCK'"],
+                stats_statements=["count(*) as blockCount by terminatingRuleId"],
+                sort="blockCount desc",
+                limit=25,
+            ),
+            log_groups=[waf_log_group],
+        )
+        logs.QueryDefinition(
+            self,
+            "WafRateLimited",
+            query_definition_name=f"{self.stack_name}/WAF/RateLimitedIPs",
+            query_string=logs.QueryString(
+                filter_statements=["terminatingRuleId = 'RateLimitPerIP'"],
+                stats_statements=["count(*) as blockCount by httpRequest.clientIp"],
+                sort="blockCount desc",
+                limit=25,
+            ),
+            log_groups=[waf_log_group],
+        )
+
         NagSuppressions.add_stack_suppressions(
             self,
             [
