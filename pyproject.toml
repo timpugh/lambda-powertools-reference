@@ -7,7 +7,7 @@ requires-python = ">=3.12"
 # Ruff — fast Python linter and formatter (replaces flake8, isort, and black)
 # =============================================================================
 [tool.ruff]
-target-version = "py312"
+target-version = "py313"
 line-length = 120
 exclude = [".venv", "cdk.out", "docs", "__pycache__"]
 
@@ -61,7 +61,7 @@ known-third-party = ["aws_lambda_powertools", "boto3"]
 # All settings tighten type safety beyond mypy's permissive defaults.
 # =============================================================================
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.13"
 warn_return_any = true          # warn when a typed function returns Any (often masks missing types)
 warn_unused_configs = true      # warn if a mypy config section is unused or misspelled
 warn_unused_ignores = true      # warn if a # type: ignore comment is no longer needed (prevents rot)

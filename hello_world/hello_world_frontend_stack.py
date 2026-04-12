@@ -83,10 +83,11 @@ class HelloWorldFrontendStack(Stack):
         )
 
         # ── S3 access logging bucket ─────────────────────────────────────────
-        # Receives S3 server access logs from FrontendBucket. Must use SSE-S3
-        # (not SSE-KMS) because the S3 log delivery service does not support
-        # KMS-encrypted target buckets. This bucket itself does not need access
-        # logging (that would be circular), versioning, or replication.
+        # Receives both S3 server access logs and CloudFront standard access
+        # logs. Must use SSE-S3 (not SSE-KMS) because neither the S3 log
+        # delivery service nor CloudFront standard logging support KMS-encrypted
+        # target buckets. This bucket itself does not need access logging (that
+        # would be circular), versioning, or replication.
         access_log_bucket = s3.Bucket(
             self,
             "FrontendAccessLogBucket",
@@ -165,6 +166,9 @@ class HelloWorldFrontendStack(Stack):
             ],
             minimum_protocol_version=cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
             web_acl_id=waf_acl_arn,
+            enable_logging=True,
+            log_bucket=access_log_bucket,
+            log_file_prefix="cloudfront/",
         )
 
         # ── Deploy frontend assets ───────────────────────────────────────────
@@ -269,7 +273,6 @@ class HelloWorldFrontendStack(Stack):
             [
                 # ── AWS Solutions ────────────────────────────────────────────────
                 {"id": "AwsSolutions-CFR1", "reason": "Geo restriction not required for sample app"},
-                {"id": "AwsSolutions-CFR3", "reason": "CloudFront access logging not enabled for sample app"},
                 {
                     "id": "AwsSolutions-CFR4",
                     "reason": "Using default CloudFront certificate — no custom domain for sample app",

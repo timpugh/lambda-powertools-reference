@@ -459,7 +459,7 @@ All tool configuration is consolidated in `pyproject.toml`. Here is a summary of
 
 | Setting | Value | Purpose |
 |---|---|---|
-| `target-version` | `py312` | Enables Python 3.12-specific lint rules and syntax modernization |
+| `target-version` | `py313` | Enables Python 3.13-specific lint rules and syntax modernization |
 | `line-length` | `120` | Maximum line length enforced by the formatter |
 | `dummy-variable-rgx` | `^(_+\|...)$` | Allows `_`-prefixed variables to be unused without triggering a lint warning |
 
@@ -791,7 +791,7 @@ Current suppressions across all stacks:
 | `AwsSolutions-IAM5` | Backend, Frontend, WAF | Per-resource (with `applies_to`) | Wildcard permissions scoped to specific actions — X-Ray, KMS `GenerateDataKey*`/`ReEncrypt*`, CDK custom resource `Resource::*` |
 | `AwsSolutions-L1` | Backend, Frontend | Per-resource (CDK singletons) | CDK-managed Lambda runtimes are not configurable; `HelloWorldFunction` uses Python 3.13 (latest) but cdk-nag rule not yet updated |
 | `AwsSolutions-S1` | Frontend | Resource (log bucket) | The access log bucket itself — logging to itself would be circular |
-| `AwsSolutions-CFR1/3` | Frontend | Stack | CloudFront access logging not enabled for sample app |
+| `AwsSolutions-CFR1` | Frontend | Stack | Geo restriction not required for sample app |
 | `AwsSolutions-CFR4` | Frontend | Stack | Default CloudFront certificate — no custom domain for sample app |
 | `Serverless-LambdaDLQ` | Backend, Frontend | Per-resource (CDK singletons) | CDK-managed Lambdas — DLQ is not configurable; `HelloWorldFunction` is synchronously invoked via API Gateway |
 | `Serverless-LambdaDefaultMemorySize` | Backend, Frontend | Per-resource (CDK singletons) | CDK-managed singleton Lambdas — memory is not configurable; `HelloWorldFunction` uses explicit 256 MB |
