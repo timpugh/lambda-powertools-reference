@@ -821,20 +821,26 @@ CDK uses context flags to opt into newer behaviors that would otherwise be break
 
 **Safe flags (added later, zero template drift):** 12 additional flags that CDK 2.248.0 recommends but that produce no CloudFormation changes against the deployed stacks. These were validated by running `cdk diff --all` with each flag enabled — zero diffs across all three stacks. They cover improved validation, metadata collection, unique resource naming, and scoped KMS/DynamoDB/Lambda/CloudFront/API Gateway behaviors.
 
-**Deferred flags (require a planned deploy):** 8 flags that produce real CloudFormation mutations when enabled. Each is documented in `cdk.json` with the flag name, a description, and the number of template changes it would produce. These should be enabled together in a single maintenance window followed by `cdk deploy --all` and integration tests. The notable ones:
+**Template-changing flags (deployed):** 5 flags that produce real CloudFormation mutations. These were validated with `cdk diff --all`, deployed, and confirmed with integration tests:
+
+| Flag | Effect |
+|---|---|
+| `@aws-cdk/core:enablePartitionLiterals` | Hardcodes `arn:aws:` partition ARNs instead of `{"Ref": "AWS::Partition"}` |
+| `@aws-cdk/aws-s3:serverAccessLogsUseBucketPolicy` | Migrates S3 access-log delivery from legacy ACL to bucket policy |
+| `@aws-cdk/aws-s3:createDefaultLoggingPolicy` | Adds default logging policy to S3 buckets |
+| `@aws-cdk/aws-s3:publicAccessBlockedByDefault` | Adds explicit public access block configuration |
+| `@aws-cdk/custom-resources:logApiResponseDataPropertyTrueDefault` | Sets `logApiResponseData` to `false` by default for custom resources |
+
+**Deferred flags (require cdk-nag suppression work):** 2 flags that restructure IAM policies and trigger new cdk-nag errors. These are documented in `cdk.json` with the `_deferred_` prefix and should be enabled together in a maintenance window:
 
 | Flag | Changes | Why it's deferred |
 |---|---|---|
-| `@aws-cdk/core:enablePartitionLiterals` | 41 | Hardcodes partition ARNs — 2 Lambda Permission replacements cause a brief API Gateway invoke gap |
-| `@aws-cdk/aws-iam:minimizePolicies` | 103 | Aggressively restructures all IAM policies — new cdk-nag errors require suppression additions |
-| `@aws-cdk/aws-s3:serverAccessLogsUseBucketPolicy` | 9 | Migrates access log bucket from ACL to bucket policy |
-| `@aws-cdk/aws-lambda:createNewPoliciesWithAddToRolePolicy` | 2 | Restructures Lambda IAM policies — triggers new cdk-nag errors |
-| `@aws-cdk/aws-apigateway:disableCloudWatchRole` | 3 | Removes account-level CloudWatch role for API Gateway |
-| `@aws-cdk/aws-s3:createDefaultLoggingPolicy` | 3 | Adds default logging policy to S3 buckets |
-| `@aws-cdk/aws-s3:publicAccessBlockedByDefault` | 3 | Adds explicit public access block |
-| `@aws-cdk/custom-resources:logApiResponseDataPropertyTrueDefault` | 6 | Changes custom resource config, may cause replacement |
+| `@aws-cdk/aws-lambda:createNewPoliciesWithAddToRolePolicy` | 2 | Restructures Lambda IAM policies — triggers new cdk-nag errors requiring suppressions |
+| `@aws-cdk/aws-iam:minimizePolicies` | 103 | Aggressively restructures all IAM policies — triggers new cdk-nag errors |
 
-To enable the deferred flags: uncomment them in `cdk.json` (remove the `_deferred_` prefix), run `cdk diff --all` to review, add any new cdk-nag suppressions, then `cdk deploy --all`. Run integration tests afterward to confirm no regressions.
+To enable the deferred flags: remove the `_deferred_` prefix in `cdk.json`, run `cdk diff --all` to review, add any new cdk-nag suppressions, then `cdk deploy --all`. Run integration tests afterward to confirm no regressions.
+
+**Skipped flag:** `@aws-cdk/aws-apigateway:disableCloudWatchRole` is intentionally **not** enabled. It removes the account-level CloudWatch role for API Gateway, which is incompatible with NIST 800-53 R5 — execution logging (`AwsSolutions-APIG6` / `APIGWExecutionLoggingEnabled`) requires that role.
 
 ## Frontend stack
 

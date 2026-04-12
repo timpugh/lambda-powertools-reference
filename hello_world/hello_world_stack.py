@@ -474,7 +474,11 @@ class HelloWorldStack(Stack):
             apply_to_children=True,
         )
 
-        # API Gateway CloudWatch role — CDK-managed, uses managed policy
+        # API Gateway CloudWatch role — CDK-managed, uses managed policy.
+        # cloud_watch_role=True is required for execution logging (NIST.800.53.R5-
+        # APIGWExecutionLoggingEnabled / AwsSolutions-APIG6). The disableCloudWatchRole
+        # CDK flag is intentionally NOT enabled because NIST compliance requires
+        # execution logging, which requires the account-level CloudWatch role.
         NagSuppressions.add_resource_suppressions_by_path(
             self,
             f"/{self.stack_name}/HelloWorldApi/CloudWatchRole/Resource",

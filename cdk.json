@@ -31,14 +31,16 @@
     "@aws-cdk/aws-apigateway:authorizerChangeDeploymentLogicalId": true,
     "@aws-cdk/customresources:installLatestAwsSdkDefault": false,
 
-    "_comment_deferred_flags": "These flags are recommended by CDK but produce template changes requiring a deploy. Enable them together in a planned maintenance window.",
-    "_deferred_@aws-cdk/core:enablePartitionLiterals": "Hardcodes partition ARNs (41 changes, 2 Lambda Permission replacements — brief API Gateway invoke gap)",
-    "_deferred_@aws-cdk/aws-s3:serverAccessLogsUseBucketPolicy": "Migrates access log bucket from ACL to bucket policy (9 changes)",
-    "_deferred_@aws-cdk/aws-s3:createDefaultLoggingPolicy": "Adds default logging policy to S3 buckets (3 changes)",
-    "_deferred_@aws-cdk/aws-s3:publicAccessBlockedByDefault": "Adds explicit public access block (3 changes)",
-    "_deferred_@aws-cdk/aws-apigateway:disableCloudWatchRole": "Removes account-level CloudWatch role for API Gateway (3 changes)",
-    "_deferred_@aws-cdk/custom-resources:logApiResponseDataPropertyTrueDefault": "Changes custom resource config, may replace (6 changes)",
+    "_comment_template_changing_flags": "These flags produce real CloudFormation changes and were validated via cdk diff before enabling.",
+    "@aws-cdk/core:enablePartitionLiterals": true,
+    "@aws-cdk/aws-s3:serverAccessLogsUseBucketPolicy": true,
+    "@aws-cdk/aws-s3:createDefaultLoggingPolicy": true,
+    "@aws-cdk/aws-s3:publicAccessBlockedByDefault": true,
+    "@aws-cdk/custom-resources:logApiResponseDataPropertyTrueDefault": false,
+
+    "_comment_deferred_flags": "These flags trigger new cdk-nag errors requiring suppression additions. Enable together when ready to update IAM policy structure.",
     "_deferred_@aws-cdk/aws-lambda:createNewPoliciesWithAddToRolePolicy": "Restructures Lambda IAM policies — triggers new cdk-nag errors requiring suppressions (2 changes)",
-    "_deferred_@aws-cdk/aws-iam:minimizePolicies": "Aggressively restructures all IAM policies — 103 changes and new cdk-nag errors"
+    "_deferred_@aws-cdk/aws-iam:minimizePolicies": "Aggressively restructures all IAM policies — 103 changes and new cdk-nag errors",
+    "_skipped_@aws-cdk/aws-apigateway:disableCloudWatchRole": "Incompatible with NIST 800-53 R5 — execution logging (APIG6 / APIGWExecutionLoggingEnabled) requires the account-level CloudWatch role"
   }
 }
