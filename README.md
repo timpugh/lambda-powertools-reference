@@ -156,14 +156,21 @@ To use the CDK, you need the following tools.
 * AWS CDK CLI - [Install the CDK CLI](https://docs.aws.amazon.com/cdk/v2/guide/getting-started.html)
 * AWS SAM CLI - [Install the SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html) - Required for local invocation and log tailing
 * [Python 3 installed](https://www.python.org/downloads/)
-* [Finch](https://runfinch.com/) - Container runtime used for bundling Lambda dependencies and local invocation
+* A container runtime for bundling Lambda dependencies — either of:
+  * [Finch](https://runfinch.com/) — AWS-supported, open-source, license-friendly (recommended)
+  * [Docker](https://www.docker.com/) — drop-in alternative; CDK uses Docker by default when `CDK_DOCKER` is unset
 
 ## Deploy the application
 
-This project uses Finch as the container runtime for bundling Lambda dependencies during synthesis. Set the `CDK_DOCKER` environment variable before running CDK commands (see the [CDK GitHub issue](https://github.com/aws/aws-cdk/issues/23680#issuecomment-1741643237) where this was added):
+This project needs a container runtime for bundling Lambda dependencies during synthesis. Either [Finch](https://runfinch.com/) or [Docker](https://www.docker.com/) works — CDK uses whichever runtime is pointed to by the `CDK_DOCKER` environment variable, and falls back to Docker when the variable is unset (see the [CDK GitHub issue](https://github.com/aws/aws-cdk/issues/23680#issuecomment-1741643237) where Finch support was added). Pick one:
 
 ```bash
+# Option 1: Finch (recommended — license-friendly, AWS-supported open source)
+finch vm start
 export CDK_DOCKER=finch
+
+# Option 2: Docker (drop-in alternative — no env var needed, CDK auto-detects it)
+# Just make sure the Docker daemon is running; no CDK_DOCKER export required
 ```
 
 To set up and deploy your application for the first time, run the following in your shell:
@@ -185,11 +192,10 @@ pip install -r tests/requirements.txt -r lambda/requirements.txt
 # Shortcut for the three steps above (after activating the venv):
 # make install
 
-# Make sure Finch is running
-finch vm start
-
-# Set Finch as the container runtime for CDK
-export CDK_DOCKER=finch
+# Start your container runtime (pick one from the block above)
+finch vm start           # if using Finch
+# -- or --
+# (nothing needed for Docker — just ensure Docker Desktop / daemon is running)
 
 # Bootstrap CDK in us-east-1 (always required — WAF stack always deploys here)
 cdk bootstrap aws://YOUR_ACCOUNT_ID/us-east-1
@@ -198,7 +204,7 @@ cdk bootstrap aws://YOUR_ACCOUNT_ID/us-east-1
 cdk deploy --all
 ```
 
-The `cdk synth` and `cdk deploy` commands use Finch to build a container that installs the Lambda dependencies from `lambda/requirements.txt` into the deployment package. The first run will be slower as it pulls the SAM build image.
+The `cdk synth` and `cdk deploy` commands use your chosen container runtime to build an image that installs the Lambda dependencies from `lambda/requirements.txt` into the deployment package. The first run will be slower as it pulls the AWS Lambda Python build image (distributed via the SAM project, hence the "SAM build image" label you may see in logs).
 
 After deployment, CloudFormation outputs useful values directly in the terminal. Each stack exposes the following:
 
@@ -254,10 +260,14 @@ cdk destroy --all -c region=ap-southeast-1
 
 ## Use the CDK to build and test locally
 
-Synthesize your application to verify the CloudFormation template (requires Finch running):
+Synthesize your application to verify the CloudFormation template (requires a container runtime — Finch or Docker — to be running):
 
 ```bash
+# If using Finch:
 export CDK_DOCKER=finch
+cdk synth
+
+# If using Docker: just run `cdk synth` — CDK auto-detects Docker
 cdk synth
 ```
 
@@ -276,11 +286,7 @@ sam local start-api -t cdk.out/HelloWorld.template.json
 curl http://localhost:3000/hello
 ```
 
-**Note:** Local invocation requires Finch to be running:
-
-```bash
-finch vm start
-```
+**Note:** Local invocation requires a container runtime to be running. The SAM CLI uses whichever one the host provides — Docker Desktop, the Docker engine, or Finch (via `finch vm start`).
 
 ## Fetch, tail, and filter Lambda function logs
 
