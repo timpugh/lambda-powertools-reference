@@ -243,16 +243,22 @@ class HelloWorldStack(Stack):
                     )
                 },
                 access_log_destination=apigw.LogGroupLogDestination(api_log_group),
-                access_log_format=apigw.AccessLogFormat.json_with_standard_fields(
-                    caller=True,
-                    http_method=True,
-                    ip=True,
-                    protocol=True,
-                    request_time=True,
-                    resource_path=True,
-                    response_length=True,
-                    status=True,
-                    user=True,
+                access_log_format=apigw.AccessLogFormat.custom(
+                    '{"requestId":"$context.requestId",'
+                    '"accountId":"$context.accountId",'
+                    '"apiId":"$context.apiId",'
+                    '"stage":"$context.stage",'
+                    '"resourcePath":"$context.resourcePath",'
+                    '"httpMethod":"$context.httpMethod",'
+                    '"protocol":"$context.protocol",'
+                    '"status":"$context.status",'
+                    '"responseType":"$context.error.responseType",'
+                    '"errorMessage":"$context.error.message",'
+                    '"requestTime":"$context.requestTime",'
+                    '"ip":"$context.identity.sourceIp",'
+                    '"caller":"$context.identity.caller",'
+                    '"user":"$context.identity.user",'
+                    '"responseLength":"$context.responseLength"}'
                 ),
                 logging_level=apigw.MethodLoggingLevel.INFO,
                 data_trace_enabled=False,
