@@ -92,7 +92,7 @@ Resources are split across three stacks. All resources in all stacks have `Remov
 | Lambda Function | Runs the hello-world handler (256 MB, X-Ray tracing, JSON logging) |
 | CloudWatch Log Group | Lambda log group with 1-week retention, KMS-encrypted |
 | API Gateway REST API | Exposes `GET /hello` with X-Ray tracing, 0.5 GB encrypted cache |
-| CloudWatch Log Group (access) | API Gateway access logs, KMS-encrypted |
+| CloudWatch Log Group (access) | API Gateway access logs (16-field JSON), KMS-encrypted |
 | CloudWatch Log Group (execution) | API Gateway execution logs, KMS-encrypted |
 | DynamoDB Table | Idempotency records (TTL, PAY_PER_REQUEST, PITR, KMS-encrypted) |
 | SSM Parameter | Greeting message (`/{stack}/greeting`) |
@@ -109,8 +109,8 @@ Resources are split across three stacks. All resources in all stacks have `Remov
 |---|---|
 | KMS Key | Encrypts the frontend S3 bucket and auto-delete Lambda log group |
 | S3 Bucket (frontend) | Private static assets, KMS-encrypted, server access logging enabled |
-| S3 Bucket (access logs) | Receives S3 server access logs (SSE-S3 — log delivery requires it) |
-| CloudFront Distribution | HTTPS-only, TLS 1.2+, WAF-protected, SECURITY_HEADERS policy |
+| S3 Bucket (access logs) | Receives S3 server access logs and CloudFront standard access logs (SSE-S3 — log delivery requires it) |
+| CloudFront Distribution | HTTPS-only, TLS 1.2+, WAF-protected, SECURITY_HEADERS policy, access logging to S3 |
 | CloudWatch Log Group (auto-delete) | Auto-delete Lambda log group, KMS-encrypted |
 
 ## Quick start
@@ -903,7 +903,7 @@ The static assets themselves live in the `frontend/` directory at the project ro
 
 The bucket is fully private — no public access of any kind. CloudFront reaches it exclusively via [Origin Access Control (OAC)](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html), the current AWS-recommended successor to OAI. The bucket is encrypted with SSE-KMS (customer-managed key with annual rotation), has SSL enforced, server access logging enabled to a dedicated log bucket, versioning disabled (git is the source of truth), and `auto_delete_objects=True` so `cdk destroy` empties and deletes it cleanly.
 
-The access log bucket uses SSE-S3 rather than SSE-KMS — the S3 log delivery service does not support writing to KMS-encrypted target buckets.
+The access log bucket uses SSE-S3 rather than SSE-KMS — neither the S3 log delivery service nor CloudFront standard logging support writing to KMS-encrypted target buckets. CloudFront logs are written under the `cloudfront/` prefix to separate them from S3 server access logs.
 
 ### CloudFront distribution
 
@@ -916,6 +916,7 @@ The access log bucket uses SSE-S3 rather than SSE-KMS — the S3 log delivery se
 | Default root object | `index.html` | Serves the app at `/` |
 | Error responses | 403/404 → `index.html` (200) | Supports SPA client-side routing |
 | Cache invalidation | `/*` on every deploy | New assets served immediately |
+| Access logging | S3 bucket with `cloudfront/` prefix | Every viewer request logged for audit and debugging |
 
 ### WAF rules
 
@@ -933,6 +934,21 @@ All rules emit CloudWatch metrics and sampled requests, so WAF activity is visib
 WAF access logs are written to a CloudWatch Logs log group named `aws-waf-logs-{stack_name}` (the `aws-waf-logs-` prefix is an AWS requirement). The log group is KMS-encrypted with a customer-managed key and has 1-week retention.
 
 The WAF WebACL lives in `HelloWorldWafStack` which is always pinned to `us-east-1`. This is an AWS hard constraint for CloudFront-scoped WebACLs. The cross-region reference pattern described above handles wiring the ARN to CloudFront automatically regardless of where the frontend stack is deployed.
+
+### Observability
+
+Every layer of the stack emits structured logs and/or traces:
+
+| Layer | Log destination | Format | X-Ray |
+|-------|----------------|--------|-------|
+| **Lambda** | CloudWatch Logs (JSON) | Powertools Logger — `xray_trace_id`, `function_name`, `request_id`, `level`, `message`, `timestamp`, `service`, plus custom keys | `tracing=Tracing.ACTIVE` |
+| **API Gateway (access)** | CloudWatch Logs (JSON) | 16 fields via typed `AccessLogField` references — `requestId`, `accountId`, `apiId`, `stage`, `resourcePath`, `httpMethod`, `protocol`, `status`, `responseType`, `errorMessage`, `requestTime`, `ip`, `caller`, `user`, `responseLength`, `xrayTraceId` | `tracing_enabled=True` |
+| **API Gateway (execution)** | CloudWatch Logs | AWS-managed format — request/response payloads, integration latency, errors | Same as above |
+| **CloudFront** | S3 (`cloudfront/` prefix) | AWS fixed 33-field tab-delimited format — client IP, URI, status, edge location, etc. | N/A (traces propagate from API Gateway → Lambda) |
+| **S3** | S3 (root prefix) | AWS fixed ~25-field space-delimited format — requester, operation, key, status, bytes | N/A |
+| **WAF** | CloudWatch Logs (`aws-waf-logs-*`) | AWS JSON — action, rule matched, request headers, country, URI | N/A |
+
+X-Ray traces flow end-to-end: API Gateway creates the trace, Lambda continues it with subsegments (via Powertools Tracer `@tracer.capture_method`), and the `xrayTraceId` is included in API Gateway access logs for correlation. S3 and CloudFront access logs use AWS-fixed formats that are not customizable.
 
 ### Resource cleanup
 
