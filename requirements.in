@@ -11,7 +11,7 @@ cdk-nag==2.37.55
 # Static analysis & linting
 radon==6.0.1
 xenon==0.9.3
-mypy==1.20.0
+mypy==1.20.1
 ruff==0.15.10
 pylint==4.0.5
 bandit==1.9.4
