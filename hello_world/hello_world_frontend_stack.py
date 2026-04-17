@@ -100,6 +100,10 @@ class HelloWorldFrontendStack(Stack):
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
             encryption=s3.BucketEncryption.S3_MANAGED,
             enforce_ssl=True,
+            # CloudFront standard logging requires ACL-based delivery — the bucket owner
+            # needs FULL_CONTROL on delivered log objects. BUCKET_OWNER_PREFERRED keeps
+            # Object Ownership set so ACLs remain usable for CloudFront log delivery.
+            object_ownership=s3.ObjectOwnership.BUCKET_OWNER_PREFERRED,
             versioned=False,
             removal_policy=RemovalPolicy.DESTROY,
             auto_delete_objects=True,
@@ -440,7 +444,7 @@ class HelloWorldFrontendStack(Stack):
         # SSE-S3 encryption matches the bucket default (SSE-KMS not supported
         # by S3/CloudFront log delivery to this bucket).
         workgroup_name = f"{self.node.id}-access-logs"
-        athena.CfnWorkGroup(
+        workgroup = athena.CfnWorkGroup(
             self,
             "AccessLogsWorkGroup",
             name=workgroup_name,
@@ -458,7 +462,8 @@ class HelloWorldFrontendStack(Stack):
         )
 
         # ── Athena Named Queries — CloudFront ────────────────────────────
-        athena.CfnNamedQuery(
+        # Each named query must wait for the workgroup to exist.
+        nq_cf_top_uris = athena.CfnNamedQuery(
             self,
             "CfTopRequestedUris",
             database=db_name,
@@ -474,7 +479,8 @@ GROUP BY cs_uri_stem, cs_method
 ORDER BY request_count DESC
 LIMIT 25""",
         )
-        athena.CfnNamedQuery(
+        nq_cf_top_uris.add_dependency(workgroup)
+        nq_cf_errors = athena.CfnNamedQuery(
             self,
             "CfErrorResponses",
             database=db_name,
@@ -489,7 +495,8 @@ WHERE sc_status LIKE '4%' OR sc_status LIKE '5%'
 ORDER BY log_date DESC, log_time DESC
 LIMIT 50""",
         )
-        athena.CfnNamedQuery(
+        nq_cf_errors.add_dependency(workgroup)
+        nq_cf_top_ips = athena.CfnNamedQuery(
             self,
             "CfTopClientIps",
             database=db_name,
@@ -504,7 +511,8 @@ GROUP BY c_ip
 ORDER BY request_count DESC
 LIMIT 25""",
         )
-        athena.CfnNamedQuery(
+        nq_cf_top_ips.add_dependency(workgroup)
+        nq_cf_bandwidth = athena.CfnNamedQuery(
             self,
             "CfBandwidthByEdge",
             database=db_name,
@@ -520,7 +528,8 @@ GROUP BY x_edge_location
 ORDER BY bytes_out DESC
 LIMIT 25""",
         )
-        athena.CfnNamedQuery(
+        nq_cf_bandwidth.add_dependency(workgroup)
+        nq_cf_cache = athena.CfnNamedQuery(
             self,
             "CfCacheHitRatio",
             database=db_name,
@@ -534,9 +543,10 @@ FROM cloudfront_logs
 GROUP BY x_edge_result_type
 ORDER BY request_count DESC""",
         )
+        nq_cf_cache.add_dependency(workgroup)
 
         # ── Athena Named Queries — S3 ────────────────────────────────────
-        athena.CfnNamedQuery(
+        nq_s3_ops = athena.CfnNamedQuery(
             self,
             "S3TopOperations",
             database=db_name,
@@ -551,7 +561,8 @@ GROUP BY operation
 ORDER BY op_count DESC
 LIMIT 25""",
         )
-        athena.CfnNamedQuery(
+        nq_s3_ops.add_dependency(workgroup)
+        nq_s3_errors = athena.CfnNamedQuery(
             self,
             "S3ErrorRequests",
             database=db_name,
@@ -566,7 +577,8 @@ WHERE http_status NOT IN ('200', '204', '206', '304', '-')
 ORDER BY request_datetime DESC
 LIMIT 50""",
         )
-        athena.CfnNamedQuery(
+        nq_s3_errors.add_dependency(workgroup)
+        nq_s3_requesters = athena.CfnNamedQuery(
             self,
             "S3TopRequesters",
             database=db_name,
@@ -581,6 +593,7 @@ GROUP BY remote_ip, requester
 ORDER BY request_count DESC
 LIMIT 25""",
         )
+        nq_s3_requesters.add_dependency(workgroup)
 
         # ── Outputs ──────────────────────────────────────────────────────
         CfnOutput(
