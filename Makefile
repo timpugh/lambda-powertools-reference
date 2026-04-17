@@ -66,7 +66,8 @@ security: ## Run bandit security scan and pip-audit vulnerability check
 # Documentation
 # =============================================================================
 
-docs: ## Build Sphinx HTML documentation
+docs: ## Build Sphinx HTML documentation (regenerates the OpenAPI spec first)
+	$(PYTHON) docs/generate_openapi.py
 	PYTHONPATH=lambda:. sphinx-build -b html docs docs/_build
 
 docs-open: docs ## Build and open documentation in browser

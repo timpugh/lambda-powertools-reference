@@ -3,7 +3,9 @@
 This module implements a serverless API endpoint that returns a greeting message.
 It demonstrates the use of Powertools utilities including structured logging,
 X-Ray tracing, CloudWatch metrics, idempotency, SSM parameters, feature flags,
-response validation, and Event Source Data Classes.
+Pydantic-backed request/response validation (with an OpenAPI spec generated
+at documentation-build time — see docs/generate_openapi.py), and Event Source
+Data Classes.
 """
 
 import os
@@ -22,12 +24,22 @@ from aws_lambda_powertools.utilities.idempotency import (
 from aws_lambda_powertools.utilities.idempotency.config import IdempotencyConfig
 from aws_lambda_powertools.utilities.parameters import get_parameter
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_powertools.utilities.validation import validate
+from pydantic import BaseModel
 
 logger = Logger()
 tracer = Tracer()
 metrics = Metrics()
-app = APIGatewayRestResolver(cors=CORSConfig(allow_origin="*", max_age=300))
+
+# enable_validation=True wires Pydantic into the resolver. Request bodies and
+# response return types are validated against their model annotations, and
+# those same models drive the OpenAPI schema read by docs/generate_openapi.py.
+# We deliberately do NOT call app.enable_swagger() here — exposing the spec at
+# runtime would publish the full API surface to any caller. The spec is
+# instead rendered into Sphinx at documentation-build time.
+app = APIGatewayRestResolver(
+    cors=CORSConfig(allow_origin="*", max_age=300),
+    enable_validation=True,
+)
 
 # Idempotency setup
 persistence_layer = DynamoDBPersistenceLayer(
@@ -46,19 +58,16 @@ app_config_store = AppConfigStore(
 )
 feature_flags = FeatureFlags(store=app_config_store)
 
-# Response validation schema for the route handler output
-RESPONSE_SCHEMA = {
-    "type": "object",
-    "required": ["message"],
-    "properties": {
-        "message": {"type": "string"},
-    },
-}
+
+class HelloResponse(BaseModel):
+    """Response body for GET /hello."""
+
+    message: str
 
 
 @app.get("/hello")
 @tracer.capture_method
-def hello() -> dict:
+def hello() -> HelloResponse:
     """Handle GET /hello requests.
 
     Fetches the greeting from SSM Parameter Store, checks the enhanced_greeting
@@ -66,7 +75,7 @@ def hello() -> dict:
     the API Gateway event.
 
     Returns:
-        dict: Response body with a ``message`` key.
+        HelloResponse: Validated response model with a ``message`` field.
     """
     metrics.add_metric(name="HelloRequests", unit=MetricUnit.Count, value=1)
 
@@ -105,9 +114,7 @@ def hello() -> dict:
     else:
         message = greeting
 
-    response = {"message": message}
-    validate(event=response, schema=RESPONSE_SCHEMA)
-    return response
+    return HelloResponse(message=message)
 
 
 @logger.inject_lambda_context

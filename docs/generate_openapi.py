@@ -1,0 +1,38 @@
+"""Generate the OpenAPI spec for the Hello World API.
+
+Imports the Lambda resolver, calls get_openapi_json_schema() on it, and writes
+the result to docs/openapi.json. Runs as a pre-build step for Sphinx via the
+``docs`` Make target, so the rendered API reference always reflects the
+routes and Pydantic models currently in the code.
+
+The spec is intentionally generated at build time rather than served at
+runtime: exposing it via API Gateway would publish the full API surface to
+any caller, which we do not want for a reference service.
+"""
+
+import json
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT / "lambda"))
+
+# Import must follow sys.path mutation so the lambda/ directory is importable.
+from app import app  # noqa: E402
+
+OUTPUT_PATH = Path(__file__).resolve().parent / "openapi.json"
+
+
+def main() -> None:
+    spec = app.get_openapi_json_schema(
+        title="Hello World API",
+        version="1.0.0",
+        description="Reference serverless API built on AWS Lambda Powertools",
+    )
+    # Re-serialize through json to get stable, human-readable formatting that
+    # diffs cleanly in PRs if the spec is ever committed.
+    OUTPUT_PATH.write_text(json.dumps(json.loads(spec), indent=2) + "\n")
+
+
+if __name__ == "__main__":
+    main()

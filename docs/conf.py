@@ -8,6 +8,9 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
     "myst_parser",
+    # Renders the OpenAPI spec at docs/openapi.json, generated pre-build by
+    # docs/generate_openapi.py (invoked from the Makefile docs target).
+    "sphinxcontrib.openapi",
 ]
 
 # Support both .rst and .md
