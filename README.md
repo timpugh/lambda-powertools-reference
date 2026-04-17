@@ -109,9 +109,14 @@ Resources are split across three stacks. All resources in all stacks have `Remov
 |---|---|
 | KMS Key | Encrypts the frontend S3 bucket and auto-delete Lambda log group |
 | S3 Bucket (frontend) | Private static assets, KMS-encrypted, server access logging enabled |
-| S3 Bucket (access logs) | Receives S3 server access logs and CloudFront standard access logs (SSE-S3 — log delivery requires it) |
+| S3 Bucket (access logs) | Receives S3 server access logs (`s3-access-logs/`), CloudFront standard access logs (`cloudfront/`), and Athena query results (`athena-results/`). SSE-S3 — log delivery requires it |
 | CloudFront Distribution | HTTPS-only, TLS 1.2+, WAF-protected, SECURITY_HEADERS policy, access logging to S3 |
 | CloudWatch Log Group (auto-delete) | Auto-delete Lambda log group, KMS-encrypted |
+| Glue Database | Catalog database for CloudFront and S3 access log analytics |
+| Glue Table (`cloudfront_logs`) | 33-field tab-delimited schema for CloudFront standard access logs |
+| Glue Table (`s3_access_logs`) | 26-field regex-parsed schema for S3 server access logs |
+| Athena WorkGroup | Query execution config with SSE-S3 encrypted results, CloudWatch metrics enabled |
+| Athena Named Queries (5 CloudFront + 3 S3) | Pre-built SQL queries: top URIs, errors, top IPs, bandwidth by edge, cache hit ratio, top operations, error requests, top requesters |
 
 ## Quick start
 
@@ -226,6 +231,8 @@ After deployment, CloudFormation outputs useful values directly in the terminal.
 - `CloudFrontDomainName` — `https://` URL to open in a browser
 - `CloudFrontDistributionId` — Distribution ID for manual cache invalidations
 - `FrontendBucketName` — S3 bucket name for direct asset inspection
+- `GlueDatabaseName` — Glue catalog database for access log analytics
+- `AthenaWorkGroupName` — Athena workgroup for querying access logs
 
 ### Deploying to a different region
 
@@ -903,7 +910,7 @@ The static assets themselves live in the `frontend/` directory at the project ro
 
 The bucket is fully private — no public access of any kind. CloudFront reaches it exclusively via [Origin Access Control (OAC)](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html), the current AWS-recommended successor to OAI. The bucket is encrypted with SSE-KMS (customer-managed key with annual rotation), has SSL enforced, server access logging enabled to a dedicated log bucket, versioning disabled (git is the source of truth), and `auto_delete_objects=True` so `cdk destroy` empties and deletes it cleanly.
 
-The access log bucket uses SSE-S3 rather than SSE-KMS — neither the S3 log delivery service nor CloudFront standard logging support writing to KMS-encrypted target buckets. CloudFront logs are written under the `cloudfront/` prefix to separate them from S3 server access logs.
+The access log bucket uses SSE-S3 rather than SSE-KMS — neither the S3 log delivery service nor CloudFront standard logging support writing to KMS-encrypted target buckets. The bucket is organized by prefix: `cloudfront/` for CloudFront standard logs, `s3-access-logs/` for S3 server access logs, and `athena-results/` for Athena query output. Glue catalog tables point at the log prefixes so Athena can query them directly with SQL.
 
 ### CloudFront distribution
 
@@ -945,10 +952,45 @@ Every layer of the stack emits structured logs and/or traces:
 | **API Gateway (access)** | CloudWatch Logs (JSON) | 16 fields via typed `AccessLogField` references — `requestId`, `accountId`, `apiId`, `stage`, `resourcePath`, `httpMethod`, `protocol`, `status`, `responseType`, `errorMessage`, `requestTime`, `ip`, `caller`, `user`, `responseLength`, `xrayTraceId` | `tracing_enabled=True` |
 | **API Gateway (execution)** | CloudWatch Logs | AWS-managed format — request/response payloads, integration latency, errors | Same as above |
 | **CloudFront** | S3 (`cloudfront/` prefix) | AWS fixed 33-field tab-delimited format — client IP, URI, status, edge location, etc. | N/A (traces propagate from API Gateway → Lambda) |
-| **S3** | S3 (root prefix) | AWS fixed ~25-field space-delimited format — requester, operation, key, status, bytes | N/A |
+| **S3** | S3 (`s3-access-logs/` prefix) | AWS fixed ~25-field space-delimited format — requester, operation, key, status, bytes | N/A |
 | **WAF** | CloudWatch Logs (`aws-waf-logs-*`) | AWS JSON — action, rule matched, request headers, country, URI | N/A |
 
 X-Ray traces flow end-to-end: API Gateway creates the trace, Lambda continues it with subsegments (via Powertools Tracer `@tracer.capture_method`), and the `xrayTraceId` is included in API Gateway access logs for correlation. S3 and CloudFront access logs use AWS-fixed formats that are not customizable.
+
+### Access log analytics (Athena + Glue)
+
+CloudFront and S3 access logs are stored in S3, not CloudWatch, so they cannot be queried with CloudWatch Logs Insights. Instead, the frontend stack provisions a Glue Data Catalog and Athena workgroup for SQL-based analytics.
+
+**Glue catalog structure:**
+
+| Table | Source prefix | Format | SerDe |
+|-------|--------------|--------|-------|
+| `cloudfront_logs` | `cloudfront/` | 33-field tab-delimited (2 header lines) | `LazySimpleSerDe` |
+| `s3_access_logs` | `s3-access-logs/` | 26-field with quoted strings | `RegexSerDe` |
+
+**Access log bucket layout:**
+
+```
+s3://<access-log-bucket>/
+├── cloudfront/       ← CloudFront standard access logs
+├── s3-access-logs/   ← S3 server access logs
+└── athena-results/   ← Athena query results (SSE-S3 encrypted)
+```
+
+**Athena named queries (pre-built, ready to run):**
+
+| Query | What it shows |
+|-------|--------------|
+| CloudFront - Top Requested URIs | Most frequently requested URIs with error counts |
+| CloudFront - Error Responses | Recent 4xx/5xx responses with client and edge details |
+| CloudFront - Top Client IPs | Highest-traffic client IPs with error counts |
+| CloudFront - Bandwidth by Edge Location | Total bytes transferred per edge location |
+| CloudFront - Cache Hit Ratio | Request counts and percentages by edge result type |
+| S3 - Top Operations | Most common S3 operations with error counts |
+| S3 - Error Requests | Recent failed S3 requests with error details |
+| S3 - Top Requesters | Highest-traffic S3 requesters with error counts |
+
+To run queries, open the Athena console, select the workgroup from the stack outputs, and choose a saved query. Results are stored in the access log bucket under `athena-results/`.
 
 ### Resource cleanup
 

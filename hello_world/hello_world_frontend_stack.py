@@ -9,10 +9,16 @@ from aws_cdk import (
     Stack,
 )
 from aws_cdk import (
+    aws_athena as athena,
+)
+from aws_cdk import (
     aws_cloudfront as cloudfront,
 )
 from aws_cdk import (
     aws_cloudfront_origins as origins,
+)
+from aws_cdk import (
+    aws_glue as glue,
 )
 from aws_cdk import (
     aws_iam as iam,
@@ -135,6 +141,7 @@ class HelloWorldFrontendStack(Stack):
             encryption_key=frontend_encryption_key,
             enforce_ssl=True,
             server_access_logs_bucket=access_log_bucket,
+            server_access_logs_prefix="s3-access-logs/",
             versioned=False,
             removal_policy=RemovalPolicy.DESTROY,
             auto_delete_objects=True,
@@ -229,6 +236,8 @@ class HelloWorldFrontendStack(Stack):
                 removal_policy=RemovalPolicy.DESTROY,
             )
 
+        self._create_athena_glue_resources(access_log_bucket)
+
         # ── Per-resource cdk-nag suppressions ──────────────────────────────────
         # All Lambdas in this stack are CDK-managed singletons. They are stack-level
         # siblings, not children of user-facing constructs, so path-based suppression
@@ -287,4 +296,302 @@ class HelloWorldFrontendStack(Stack):
                     "reason": "S3 versioning not needed for sample app — static assets are redeployable via cdk deploy",
                 },
             ],
+        )
+
+    def _create_athena_glue_resources(self, access_log_bucket: s3.Bucket) -> None:
+        """Create Glue catalog tables and Athena workgroup for CloudFront/S3 access log analytics."""
+        # ── Glue Database ────────────────────────────────────────────────
+        # Glue database names: lowercase, alphanumeric + underscores only.
+        db_name = self.node.id.lower().replace("-", "_") + "_access_logs"
+
+        glue_db = glue.CfnDatabase(
+            self,
+            "AccessLogsDatabase",
+            catalog_id=self.account,
+            database_input=glue.CfnDatabase.DatabaseInputProperty(
+                name=db_name,
+                description="Glue catalog for CloudFront and S3 access logs",
+            ),
+        )
+
+        # ── CloudFront Standard Logs Table ───────────────────────────────
+        # 33-field tab-separated format; 2 header lines (#Version, #Fields).
+        # All columns typed as string — CloudFront uses '-' for missing values.
+        cf_table = glue.CfnTable(
+            self,
+            "CloudFrontLogsTable",
+            catalog_id=self.account,
+            database_name=db_name,
+            table_input=glue.CfnTable.TableInputProperty(
+                name="cloudfront_logs",
+                description="CloudFront standard access logs",
+                table_type="EXTERNAL_TABLE",
+                parameters={"skip.header.line.count": "2", "EXTERNAL": "TRUE"},
+                storage_descriptor=glue.CfnTable.StorageDescriptorProperty(
+                    location=f"s3://{access_log_bucket.bucket_name}/cloudfront/",
+                    input_format="org.apache.hadoop.mapred.TextInputFormat",
+                    output_format="org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat",
+                    serde_info=glue.CfnTable.SerdeInfoProperty(
+                        serialization_library="org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe",
+                        parameters={"field.delim": "\t", "serialization.null.format": "-"},
+                    ),
+                    columns=[
+                        glue.CfnTable.ColumnProperty(name="log_date", type="string"),
+                        glue.CfnTable.ColumnProperty(name="log_time", type="string"),
+                        glue.CfnTable.ColumnProperty(name="x_edge_location", type="string"),
+                        glue.CfnTable.ColumnProperty(name="sc_bytes", type="string"),
+                        glue.CfnTable.ColumnProperty(name="c_ip", type="string"),
+                        glue.CfnTable.ColumnProperty(name="cs_method", type="string"),
+                        glue.CfnTable.ColumnProperty(name="cs_host", type="string"),
+                        glue.CfnTable.ColumnProperty(name="cs_uri_stem", type="string"),
+                        glue.CfnTable.ColumnProperty(name="sc_status", type="string"),
+                        glue.CfnTable.ColumnProperty(name="cs_referer", type="string"),
+                        glue.CfnTable.ColumnProperty(name="cs_user_agent", type="string"),
+                        glue.CfnTable.ColumnProperty(name="cs_uri_query", type="string"),
+                        glue.CfnTable.ColumnProperty(name="cs_cookie", type="string"),
+                        glue.CfnTable.ColumnProperty(name="x_edge_result_type", type="string"),
+                        glue.CfnTable.ColumnProperty(name="x_edge_request_id", type="string"),
+                        glue.CfnTable.ColumnProperty(name="x_host_header", type="string"),
+                        glue.CfnTable.ColumnProperty(name="cs_protocol", type="string"),
+                        glue.CfnTable.ColumnProperty(name="cs_bytes", type="string"),
+                        glue.CfnTable.ColumnProperty(name="time_taken", type="string"),
+                        glue.CfnTable.ColumnProperty(name="x_forwarded_for", type="string"),
+                        glue.CfnTable.ColumnProperty(name="ssl_protocol", type="string"),
+                        glue.CfnTable.ColumnProperty(name="ssl_cipher", type="string"),
+                        glue.CfnTable.ColumnProperty(name="x_edge_response_result_type", type="string"),
+                        glue.CfnTable.ColumnProperty(name="cs_protocol_version", type="string"),
+                        glue.CfnTable.ColumnProperty(name="fle_status", type="string"),
+                        glue.CfnTable.ColumnProperty(name="fle_encrypted_fields", type="string"),
+                        glue.CfnTable.ColumnProperty(name="c_port", type="string"),
+                        glue.CfnTable.ColumnProperty(name="time_to_first_byte", type="string"),
+                        glue.CfnTable.ColumnProperty(name="x_edge_detailed_result_type", type="string"),
+                        glue.CfnTable.ColumnProperty(name="sc_content_type", type="string"),
+                        glue.CfnTable.ColumnProperty(name="sc_content_len", type="string"),
+                        glue.CfnTable.ColumnProperty(name="sc_range_start", type="string"),
+                        glue.CfnTable.ColumnProperty(name="sc_range_end", type="string"),
+                    ],
+                ),
+            ),
+        )
+        cf_table.add_dependency(glue_db)
+
+        # ── S3 Server Access Logs Table ──────────────────────────────────
+        # 26-field format with quoted strings and optional trailing fields.
+        # RegexSerDe handles the complex delimiter pattern reliably.
+        s3_log_regex = (
+            r"([^ ]*) ([^ ]*) \[(.*?)\] ([^ ]*) ([^ ]*) ([^ ]*) ([^ ]*) ([^ ]*) "
+            r'("[^"]*"|-) (-|[0-9]*) ([^ ]*) ([^ ]*) ([^ ]*) ([^ ]*) ([^ ]*) '
+            r'([^ ]*) ("[^"]*"|-) ([^ ]*)(?: ([^ ]*) ([^ ]*) ([^ ]*) ([^ ]*) '
+            r"([^ ]*) ([^ ]*) ([^ ]*) ([^ ]*))?.*$"
+        )
+        s3_table = glue.CfnTable(
+            self,
+            "S3AccessLogsTable",
+            catalog_id=self.account,
+            database_name=db_name,
+            table_input=glue.CfnTable.TableInputProperty(
+                name="s3_access_logs",
+                description="S3 server access logs",
+                table_type="EXTERNAL_TABLE",
+                parameters={"EXTERNAL": "TRUE"},
+                storage_descriptor=glue.CfnTable.StorageDescriptorProperty(
+                    location=f"s3://{access_log_bucket.bucket_name}/s3-access-logs/",
+                    input_format="org.apache.hadoop.mapred.TextInputFormat",
+                    output_format="org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat",
+                    serde_info=glue.CfnTable.SerdeInfoProperty(
+                        serialization_library="org.apache.hadoop.hive.serde2.RegexSerDe",
+                        parameters={"input.regex": s3_log_regex},
+                    ),
+                    columns=[
+                        glue.CfnTable.ColumnProperty(name="bucket_owner", type="string"),
+                        glue.CfnTable.ColumnProperty(name="bucket_name", type="string"),
+                        glue.CfnTable.ColumnProperty(name="request_datetime", type="string"),
+                        glue.CfnTable.ColumnProperty(name="remote_ip", type="string"),
+                        glue.CfnTable.ColumnProperty(name="requester", type="string"),
+                        glue.CfnTable.ColumnProperty(name="request_id", type="string"),
+                        glue.CfnTable.ColumnProperty(name="operation", type="string"),
+                        glue.CfnTable.ColumnProperty(name="key", type="string"),
+                        glue.CfnTable.ColumnProperty(name="request_uri", type="string"),
+                        glue.CfnTable.ColumnProperty(name="http_status", type="string"),
+                        glue.CfnTable.ColumnProperty(name="error_code", type="string"),
+                        glue.CfnTable.ColumnProperty(name="bytes_sent", type="string"),
+                        glue.CfnTable.ColumnProperty(name="object_size", type="string"),
+                        glue.CfnTable.ColumnProperty(name="total_time", type="string"),
+                        glue.CfnTable.ColumnProperty(name="turn_around_time", type="string"),
+                        glue.CfnTable.ColumnProperty(name="referrer", type="string"),
+                        glue.CfnTable.ColumnProperty(name="user_agent", type="string"),
+                        glue.CfnTable.ColumnProperty(name="version_id", type="string"),
+                        glue.CfnTable.ColumnProperty(name="host_id", type="string"),
+                        glue.CfnTable.ColumnProperty(name="signature_version", type="string"),
+                        glue.CfnTable.ColumnProperty(name="cipher_suite", type="string"),
+                        glue.CfnTable.ColumnProperty(name="authentication_type", type="string"),
+                        glue.CfnTable.ColumnProperty(name="host_header", type="string"),
+                        glue.CfnTable.ColumnProperty(name="tls_version", type="string"),
+                        glue.CfnTable.ColumnProperty(name="access_point_arn", type="string"),
+                        glue.CfnTable.ColumnProperty(name="acl_required", type="string"),
+                    ],
+                ),
+            ),
+        )
+        s3_table.add_dependency(glue_db)
+
+        # ── Athena WorkGroup ─────────────────────────────────────────────
+        # Query results stored in the access log bucket under athena-results/.
+        # SSE-S3 encryption matches the bucket default (SSE-KMS not supported
+        # by S3/CloudFront log delivery to this bucket).
+        workgroup_name = f"{self.node.id}-access-logs"
+        athena.CfnWorkGroup(
+            self,
+            "AccessLogsWorkGroup",
+            name=workgroup_name,
+            state="ENABLED",
+            work_group_configuration=athena.CfnWorkGroup.WorkGroupConfigurationProperty(
+                result_configuration=athena.CfnWorkGroup.ResultConfigurationProperty(
+                    output_location=f"s3://{access_log_bucket.bucket_name}/athena-results/",
+                    encryption_configuration=athena.CfnWorkGroup.EncryptionConfigurationProperty(
+                        encryption_option="SSE_S3",
+                    ),
+                ),
+                enforce_work_group_configuration=True,
+                publish_cloud_watch_metrics_enabled=True,
+            ),
+        )
+
+        # ── Athena Named Queries — CloudFront ────────────────────────────
+        athena.CfnNamedQuery(
+            self,
+            "CfTopRequestedUris",
+            database=db_name,
+            work_group=workgroup_name,
+            name="CloudFront - Top Requested URIs",
+            description="Most frequently requested URIs with error counts",
+            query_string="""\
+SELECT cs_uri_stem, cs_method,
+       COUNT(*) as request_count,
+       COUNT(CASE WHEN sc_status LIKE '4%' OR sc_status LIKE '5%' THEN 1 END) as errors
+FROM cloudfront_logs
+GROUP BY cs_uri_stem, cs_method
+ORDER BY request_count DESC
+LIMIT 25""",
+        )
+        athena.CfnNamedQuery(
+            self,
+            "CfErrorResponses",
+            database=db_name,
+            work_group=workgroup_name,
+            name="CloudFront - Error Responses",
+            description="Recent 4xx/5xx error responses with client and edge details",
+            query_string="""\
+SELECT log_date, log_time, c_ip, cs_method, cs_uri_stem, sc_status,
+       x_edge_result_type, x_edge_detailed_result_type
+FROM cloudfront_logs
+WHERE sc_status LIKE '4%' OR sc_status LIKE '5%'
+ORDER BY log_date DESC, log_time DESC
+LIMIT 50""",
+        )
+        athena.CfnNamedQuery(
+            self,
+            "CfTopClientIps",
+            database=db_name,
+            work_group=workgroup_name,
+            name="CloudFront - Top Client IPs",
+            description="Highest-traffic client IPs with error counts",
+            query_string="""\
+SELECT c_ip, COUNT(*) as request_count,
+       COUNT(CASE WHEN sc_status LIKE '4%' OR sc_status LIKE '5%' THEN 1 END) as errors
+FROM cloudfront_logs
+GROUP BY c_ip
+ORDER BY request_count DESC
+LIMIT 25""",
+        )
+        athena.CfnNamedQuery(
+            self,
+            "CfBandwidthByEdge",
+            database=db_name,
+            work_group=workgroup_name,
+            name="CloudFront - Bandwidth by Edge Location",
+            description="Total bytes transferred per edge location",
+            query_string="""\
+SELECT x_edge_location, COUNT(*) as requests,
+       SUM(CAST(sc_bytes AS bigint)) as bytes_out,
+       SUM(CAST(cs_bytes AS bigint)) as bytes_in
+FROM cloudfront_logs
+GROUP BY x_edge_location
+ORDER BY bytes_out DESC
+LIMIT 25""",
+        )
+        athena.CfnNamedQuery(
+            self,
+            "CfCacheHitRatio",
+            database=db_name,
+            work_group=workgroup_name,
+            name="CloudFront - Cache Hit Ratio",
+            description="Request counts and percentages by edge result type (Hit/Miss/Error)",
+            query_string="""\
+SELECT x_edge_result_type, COUNT(*) as request_count,
+       ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER(), 2) as pct
+FROM cloudfront_logs
+GROUP BY x_edge_result_type
+ORDER BY request_count DESC""",
+        )
+
+        # ── Athena Named Queries — S3 ────────────────────────────────────
+        athena.CfnNamedQuery(
+            self,
+            "S3TopOperations",
+            database=db_name,
+            work_group=workgroup_name,
+            name="S3 - Top Operations",
+            description="Most common S3 operations with error counts",
+            query_string="""\
+SELECT operation, COUNT(*) as op_count,
+       COUNT(CASE WHEN http_status NOT IN ('200','204','206','304') THEN 1 END) as errors
+FROM s3_access_logs
+GROUP BY operation
+ORDER BY op_count DESC
+LIMIT 25""",
+        )
+        athena.CfnNamedQuery(
+            self,
+            "S3ErrorRequests",
+            database=db_name,
+            work_group=workgroup_name,
+            name="S3 - Error Requests",
+            description="Recent failed S3 requests with error details",
+            query_string="""\
+SELECT request_datetime, remote_ip, requester, operation, key,
+       request_uri, http_status, error_code
+FROM s3_access_logs
+WHERE http_status NOT IN ('200', '204', '206', '304', '-')
+ORDER BY request_datetime DESC
+LIMIT 50""",
+        )
+        athena.CfnNamedQuery(
+            self,
+            "S3TopRequesters",
+            database=db_name,
+            work_group=workgroup_name,
+            name="S3 - Top Requesters",
+            description="Highest-traffic S3 requesters with error counts",
+            query_string="""\
+SELECT remote_ip, requester, COUNT(*) as request_count,
+       COUNT(CASE WHEN http_status NOT IN ('200','204','206','304') THEN 1 END) as errors
+FROM s3_access_logs
+GROUP BY remote_ip, requester
+ORDER BY request_count DESC
+LIMIT 25""",
+        )
+
+        # ── Outputs ──────────────────────────────────────────────────────
+        CfnOutput(
+            self,
+            "GlueDatabaseName",
+            description="Glue catalog database for CloudFront and S3 access log analytics",
+            value=db_name,
+        )
+        CfnOutput(
+            self,
+            "AthenaWorkGroupName",
+            description="Athena workgroup for querying access logs",
+            value=workgroup_name,
         )
