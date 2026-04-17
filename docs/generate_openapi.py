@@ -11,11 +11,18 @@ any caller, which we do not want for a reference service.
 """
 
 import json
+import os
 import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "lambda"))
+
+# Importing app.py instantiates a DynamoDB client for the idempotency layer,
+# which requires a region. We never make a real AWS call here — we only
+# introspect the resolver — so a dummy region satisfies botocore without
+# touching any real environment.
+os.environ.setdefault("AWS_DEFAULT_REGION", "us-east-1")
 
 # Import must follow sys.path mutation so the lambda/ directory is importable.
 from app import app  # noqa: E402
