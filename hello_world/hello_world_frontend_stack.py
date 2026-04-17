@@ -594,6 +594,54 @@ ORDER BY request_count DESC
 LIMIT 25""",
         )
         nq_s3_requesters.add_dependency(workgroup)
+        nq_s3_slow = athena.CfnNamedQuery(
+            self,
+            "S3SlowRequests",
+            database=db_name,
+            work_group=workgroup_name,
+            name="S3 - Slow Requests",
+            description="Highest-latency S3 requests by total_time (ms)",
+            query_string="""\
+SELECT request_datetime, remote_ip, operation, key, http_status,
+       total_time, turn_around_time, bytes_sent
+FROM s3_access_logs
+WHERE total_time != '-'
+ORDER BY CAST(total_time AS integer) DESC
+LIMIT 50""",
+        )
+        nq_s3_slow.add_dependency(workgroup)
+        nq_s3_access_denied = athena.CfnNamedQuery(
+            self,
+            "S3AccessDenied",
+            database=db_name,
+            work_group=workgroup_name,
+            name="S3 - Access Denied (403)",
+            description="Recent 403 AccessDenied responses with requester and operation details",
+            query_string="""\
+SELECT request_datetime, remote_ip, requester, operation, key,
+       request_uri, error_code
+FROM s3_access_logs
+WHERE http_status = '403'
+ORDER BY request_datetime DESC
+LIMIT 50""",
+        )
+        nq_s3_access_denied.add_dependency(workgroup)
+        nq_s3_object_reads = athena.CfnNamedQuery(
+            self,
+            "S3ObjectReads",
+            database=db_name,
+            work_group=workgroup_name,
+            name="S3 - Object Read Audit",
+            description="Who read which object (GET.OBJECT operations) with status and bytes",
+            query_string="""\
+SELECT request_datetime, remote_ip, requester, key,
+       http_status, bytes_sent, user_agent
+FROM s3_access_logs
+WHERE operation LIKE '%GET.OBJECT%'
+ORDER BY request_datetime DESC
+LIMIT 100""",
+        )
+        nq_s3_object_reads.add_dependency(workgroup)
 
         # ── Outputs ──────────────────────────────────────────────────────
         CfnOutput(

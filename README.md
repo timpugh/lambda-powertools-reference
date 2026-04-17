@@ -116,7 +116,7 @@ Resources are split across three stacks. All resources in all stacks have `Remov
 | Glue Table (`cloudfront_logs`) | 33-field tab-delimited schema for CloudFront standard access logs |
 | Glue Table (`s3_access_logs`) | 26-field regex-parsed schema for S3 server access logs |
 | Athena WorkGroup | Query execution config with SSE-S3 encrypted results, CloudWatch metrics enabled |
-| Athena Named Queries (5 CloudFront + 3 S3) | Pre-built SQL queries: top URIs, errors, top IPs, bandwidth by edge, cache hit ratio, top operations, error requests, top requesters |
+| Athena Named Queries (5 CloudFront + 6 S3) | Pre-built SQL queries: top URIs, errors, top IPs, bandwidth by edge, cache hit ratio, top operations, error requests, top requesters, slow requests, access denied (403), object read audit |
 
 ## Quick start
 
@@ -989,8 +989,15 @@ s3://<access-log-bucket>/
 | S3 - Top Operations | Most common S3 operations with error counts |
 | S3 - Error Requests | Recent failed S3 requests with error details |
 | S3 - Top Requesters | Highest-traffic S3 requesters with error counts |
+| S3 - Slow Requests | Highest-latency requests by `total_time` |
+| S3 - Access Denied (403) | Recent 403 AccessDenied responses for IAM/policy debugging |
+| S3 - Object Read Audit | Who read which object (GET.OBJECT) with status and bytes |
 
 To run queries, open the Athena console, select the workgroup from the stack outputs, and choose a saved query. Results are stored in the access log bucket under `athena-results/`.
+
+**Scaling note.** Logs land flat under their prefix and queries scan the full dataset. At this app's scale that's free in practice, but if traffic grows enough that Athena scans start costing real money, the standard next step is partitioning by `year=/month=/day=/hour=/` — ideally with Glue partition projection so no `MSCK REPAIR` is needed — and converting to Snappy Parquet for columnar pruning. See the AWS Big Data blog [*Analyze your Amazon CloudFront access logs at scale*](https://aws.amazon.com/blogs/big-data/analyze-your-amazon-cloudfront-access-logs-at-scale/) for a full Lambda + CTAS pipeline. Conversion is fully retroactive: existing gzip logs can be backfilled with a one-shot Athena CTAS whenever the cost justifies the added complexity.
+
+**Query tuning reference.** The named queries above already follow the applicable guidance from [*Top 10 performance tuning tips for Amazon Athena*](https://aws.amazon.com/blogs/big-data/top-10-performance-tuning-tips-for-amazon-athena/) — every `ORDER BY` is paired with a `LIMIT`, no `SELECT *`, minimal `GROUP BY` columns, no joins, no `COUNT(DISTINCT)`. The remaining tips in that post (partitioning, bucketing, compression, file sizing, columnar formats) are all storage-side and are covered by the scaling note above.
 
 ### Resource cleanup
 
