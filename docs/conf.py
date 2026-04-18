@@ -8,10 +8,14 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
     "myst_parser",
-    # Renders the OpenAPI spec at docs/openapi.json, generated pre-build by
-    # docs/generate_openapi.py (invoked from the Makefile docs target).
-    "sphinxcontrib.openapi",
 ]
+
+# Copy docs/api.html (Redoc standalone wrapper) and docs/openapi.json (generated
+# pre-build by docs/generate_openapi.py) into the HTML output as-is, so the
+# built site serves a standalone Redoc page at /api.html that fetches the
+# sibling /openapi.json. See docs/api.html for the pinned-CDN + SRI-hash
+# rationale.
+html_extra_path = ["api.html", "openapi.json"]
 
 # Support both .rst and .md
 source_suffix = {

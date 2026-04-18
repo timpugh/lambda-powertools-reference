@@ -13,9 +13,13 @@ hello_world_frontend_stack
 nag_utils
 ```
 
-```{toctree}
-:maxdepth: 2
-:caption: API reference (for callers)
+## API reference (for callers)
 
-api
-```
+The HTTP API surface — paths, request/response schemas, status codes — is
+rendered by [Redoc](https://github.com/Redocly/redoc) from the OpenAPI spec
+that `docs/generate_openapi.py` produces at documentation-build time:
+
+- **[HTTP API Reference](api.html)** — interactive three-panel Redoc page
+
+The spec itself is also published as [openapi.json](openapi.json) if a caller
+wants to point their own tooling at it.

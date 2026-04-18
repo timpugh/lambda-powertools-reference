@@ -22,9 +22,13 @@ pre-commit==4.5.1
 boto3-stubs==1.42.88
 
 # Documentation
+#
+# The OpenAPI spec is rendered in the browser by the Redoc standalone bundle
+# (loaded from jsdelivr with a pinned version + SRI hash in docs/api.html),
+# so no Sphinx extension is needed for it. Sphinx just copies api.html and
+# openapi.json into the build via html_extra_path in docs/conf.py.
 sphinx==8.2.3
 myst-parser==5.0.0
-sphinxcontrib-openapi==0.8.4
 
 # Dependency management
 pip-tools==7.5.3

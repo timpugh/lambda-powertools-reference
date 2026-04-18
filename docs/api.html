@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hello World API Reference</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Montserrat:300,400,700|Roboto:300,400,700" />
+    <style>
+      body { margin: 0; padding: 0; }
+    </style>
+  </head>
+  <body>
+    <redoc spec-url="openapi.json"></redoc>
+    <!--
+      Redoc standalone bundle, pinned to a specific version with an SRI hash.
+      If jsdelivr ever serves tampered bytes, the browser will refuse to
+      execute the script. Bump the version and recompute the hash with:
+        curl -sSL https://cdn.jsdelivr.net/npm/redoc@<version>/bundles/redoc.standalone.js \
+          | openssl dgst -sha384 -binary | openssl base64 -A
+    -->
+    <script
+      src="https://cdn.jsdelivr.net/npm/redoc@2.5.2/bundles/redoc.standalone.js"
+      integrity="sha384-70P5pmIdaQdVbxvjhrcTDv1uKcKqalZ3OHi7S2J+uzDl0PW8dO6L+pHOpm9EEjGJ"
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    ></script>
+  </body>
+</html>
