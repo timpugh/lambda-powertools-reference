@@ -27,7 +27,7 @@ boto3-stubs==1.42.88
 # (loaded from jsdelivr with a pinned version + SRI hash in docs/api.html),
 # so no Sphinx extension is needed for it. Sphinx just copies api.html and
 # openapi.json into the build via html_extra_path in docs/conf.py.
-sphinx==8.2.3
+sphinx==9.1.0
 myst-parser==5.0.0
 
 # Dependency management
