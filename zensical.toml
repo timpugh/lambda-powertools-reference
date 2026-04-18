@@ -90,6 +90,7 @@ merge_init_into_class = true
 [project.markdown_extensions.def_list]
 [project.markdown_extensions.footnotes]
 [project.markdown_extensions.md_in_html]
+[project.markdown_extensions.tables]
 [project.markdown_extensions.toc]
 permalink = true
 [project.markdown_extensions.pymdownx.betterem]
