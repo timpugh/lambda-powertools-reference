@@ -1,0 +1,110 @@
+# =============================================================================
+# Zensical configuration.
+#
+# Zensical is a static site generator from the Material for MkDocs team. This
+# config drives both the developer-facing code reference (generated from
+# Python docstrings via mkdocstrings) and the caller-facing HTTP API page
+# (Scalar + the OpenAPI spec produced by scripts/generate_openapi.py).
+# =============================================================================
+
+[project]
+
+site_name = "Lambda Powertools Reference"
+site_description = "Reference serverless API built on AWS Lambda Powertools, CDK, and API Gateway"
+site_author = "timpugh"
+site_url = "https://timpugh.github.io/lambda-powertools-reference/"
+
+copyright = "Copyright &copy; 2026 Tim Pugh"
+
+# Explicit navigation. Code-reference pages are grouped under "Code reference"
+# and the Scalar-rendered API page is linked directly from the top level.
+nav = [
+    { "Overview" = "index.md" },
+    { "Code reference" = [
+        { "Lambda handler" = "lambda_handler.md" },
+        { "Backend stack" = "cdk_stack.md" },
+        { "WAF stack" = "hello_world_waf_stack.md" },
+        { "Frontend stack" = "hello_world_frontend_stack.md" },
+        { "NAG utilities" = "nag_utils.md" },
+    ] },
+    { "HTTP API reference" = "api.html" },
+]
+
+# -----------------------------------------------------------------------------
+# Theme
+# -----------------------------------------------------------------------------
+[project.theme]
+
+language = "en"
+
+features = [
+    "content.code.copy",
+    "content.code.annotate",
+    "navigation.footer",
+    "navigation.indexes",
+    "navigation.sections",
+    "navigation.top",
+    "navigation.tracking",
+    "search.highlight",
+    "toc.follow",
+]
+
+[[project.theme.palette]]
+scheme = "default"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+scheme = "slate"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to light mode"
+
+# -----------------------------------------------------------------------------
+# Plugins
+# -----------------------------------------------------------------------------
+# mkdocstrings powers the Python autodoc directive (::: module.path) used on
+# the code-reference pages. It reads the Google-style docstrings already in
+# lambda/app.py and hello_world/*.py and renders them as navigable reference
+# pages. Both source directories must be on the handler's paths list.
+[project.plugins.mkdocstrings]
+default_handler = "python"
+
+[project.plugins.mkdocstrings.handlers.python]
+paths = ["lambda", "."]
+inventories = ["https://docs.python.org/3/objects.inv"]
+
+[project.plugins.mkdocstrings.handlers.python.options]
+docstring_style = "google"
+show_source = true
+show_root_heading = true
+show_root_toc_entry = false
+merge_init_into_class = true
+
+# -----------------------------------------------------------------------------
+# Markdown extensions (keep the defaults from the Zensical template — they
+# power the Material-style admonitions, code blocks, footnotes, and tabs).
+# -----------------------------------------------------------------------------
+[project.markdown_extensions.abbr]
+[project.markdown_extensions.admonition]
+[project.markdown_extensions.attr_list]
+[project.markdown_extensions.def_list]
+[project.markdown_extensions.footnotes]
+[project.markdown_extensions.md_in_html]
+[project.markdown_extensions.toc]
+permalink = true
+[project.markdown_extensions.pymdownx.betterem]
+[project.markdown_extensions.pymdownx.caret]
+[project.markdown_extensions.pymdownx.details]
+[project.markdown_extensions.pymdownx.highlight]
+anchor_linenums = true
+line_spans = "__span"
+pygments_lang_class = true
+[project.markdown_extensions.pymdownx.inlinehilite]
+[project.markdown_extensions.pymdownx.magiclink]
+[project.markdown_extensions.pymdownx.mark]
+[project.markdown_extensions.pymdownx.superfences]
+[project.markdown_extensions.pymdownx.tabbed]
+alternate_style = true
+[project.markdown_extensions.pymdownx.tasklist]
+custom_checkbox = true
+[project.markdown_extensions.pymdownx.tilde]

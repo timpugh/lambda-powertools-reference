@@ -35,15 +35,15 @@ jobs:
           pip install -r lambda/requirements.txt
 
       - name: Generate OpenAPI spec
-        run: python docs/generate_openapi.py
+        run: python scripts/generate_openapi.py
 
       - name: Build docs
-        run: PYTHONPATH=lambda:. sphinx-build -b html docs docs/_build
+        run: zensical build
 
       - name: Upload pages artifact
         uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b  # v4.0.0
         with:
-          path: docs/_build
+          path: site
 
   deploy:
     needs: build

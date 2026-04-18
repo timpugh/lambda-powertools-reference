@@ -1,9 +1,9 @@
 # WAF Stack
 
-## API Reference
+The `hello_world.hello_world_waf_stack` module defines the us-east-1 AWS WAF
+WebACL attached to CloudFront — IP rate-limiting and the AWS-managed rule
+groups used to shield the distribution.
 
-```{eval-rst}
-.. automodule:: hello_world.hello_world_waf_stack
-   :members:
-   :show-inheritance:
-```
+## API reference
+
+::: hello_world.hello_world_waf_stack

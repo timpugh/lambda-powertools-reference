@@ -1,8 +1,8 @@
 """Generate the OpenAPI spec for the Hello World API.
 
 Imports the Lambda resolver, calls get_openapi_json_schema() on it, and writes
-the result to docs/openapi.json. Runs as a pre-build step for Sphinx via the
-``docs`` Make target, so the rendered API reference always reflects the
+the result to docs/openapi.json. Runs as a pre-build step for Zensical via
+the ``docs`` Make target, so the rendered API reference always reflects the
 routes and Pydantic models currently in the code.
 
 The spec is intentionally generated at build time rather than served at
@@ -25,10 +25,15 @@ sys.path.insert(0, str(REPO_ROOT / "lambda"))
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-east-1")
 
 # Import must follow sys.path mutation so the lambda/ directory is importable.
-from app import app  # noqa: E402
+# pylint: disable=wrong-import-position
 from aws_lambda_powertools.event_handler.openapi.models import Server, Tag  # noqa: E402
 
-OUTPUT_PATH = Path(__file__).resolve().parent / "openapi.json"
+from app import app  # noqa: E402
+
+# Write into docs/ so Zensical (which treats the docs/ tree as input and
+# copies non-markdown assets verbatim into the site) picks it up alongside
+# docs/api.html, which references it as a sibling.
+OUTPUT_PATH = REPO_ROOT / "docs" / "openapi.json"
 
 DESCRIPTION = """\
 Reference serverless API built on AWS Lambda Powertools, deployed behind

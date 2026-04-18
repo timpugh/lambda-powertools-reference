@@ -1,9 +1,9 @@
 # Lambda Handler
 
-## API Reference
+The `app` module in `lambda/app.py` is the Powertools-based request handler
+wired into API Gateway. It owns the `/hello` route, Pydantic validation, and
+the cross-cutting concerns (idempotency, feature flags, metrics, tracing).
 
-```{eval-rst}
-.. automodule:: app
-   :members:
-   :show-inheritance:
-```
+## API reference
+
+::: app

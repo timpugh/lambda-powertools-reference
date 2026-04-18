@@ -23,12 +23,21 @@ boto3-stubs==1.42.88
 
 # Documentation
 #
-# The OpenAPI spec is rendered in the browser by the Redoc standalone bundle
-# (loaded from jsdelivr with a pinned version + SRI hash in docs/api.html),
-# so no Sphinx extension is needed for it. Sphinx just copies api.html and
-# openapi.json into the build via html_extra_path in docs/conf.py.
-sphinx==8.2.3
-myst-parser==5.0.0
+# Zensical is the static site generator for project docs (Python autodoc +
+# navigation + styling). It is a next-gen successor to MkDocs Material from
+# the same author (squidfunk), built on modern tooling. It is still pre-1.0
+# — pinning exact versions because the API surface is still moving.
+#
+# mkdocstrings + mkdocstrings-python provide the Python autodoc directive
+# (::: module.path) used on the code-reference pages.
+#
+# The OpenAPI spec is rendered in the browser by the Scalar standalone
+# bundle loaded from jsdelivr (pinned version + SRI hash in docs/api.html).
+# Zensical just copies api.html and openapi.json into the build via the
+# static-file wiring in mkdocs.yml — no additional plugin needed for it.
+zensical==0.0.33
+mkdocstrings==1.0.4
+mkdocstrings-python==2.0.3
 
 # Dependency management
 pip-tools==7.5.3

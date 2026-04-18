@@ -113,11 +113,11 @@ updates:
           - "boto*"
           - "botocore*"
           - "s3transfer"
-      sphinx:
+      docs:
         patterns:
-          - "sphinx"
-          - "sphinx-*"
-          - "myst-parser"
+          - "zensical"
+          - "mkdocstrings"
+          - "mkdocstrings-*"
       linting:
         patterns:
           - "ruff"

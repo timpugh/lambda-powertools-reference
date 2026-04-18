@@ -1,9 +1,9 @@
-# CDK Stack
+# Backend CDK Stack
 
-## API Reference
+The `hello_world.hello_world_stack` module defines the backend stack: API
+Gateway, the Lambda function, DynamoDB idempotency table, SSM parameter,
+and AppConfig feature flag.
 
-```{eval-rst}
-.. automodule:: hello_world.hello_world_stack
-   :members:
-   :show-inheritance:
-```
+## API reference
+
+::: hello_world.hello_world_stack

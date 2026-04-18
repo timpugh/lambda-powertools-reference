@@ -66,12 +66,16 @@ security: ## Run bandit security scan and pip-audit vulnerability check
 # Documentation
 # =============================================================================
 
-docs: ## Build Sphinx HTML documentation (regenerates the OpenAPI spec first)
-	$(PYTHON) docs/generate_openapi.py
-	PYTHONPATH=lambda:. sphinx-build -b html docs docs/_build
+docs: ## Build Zensical HTML documentation (regenerates the OpenAPI spec first)
+	$(PYTHON) scripts/generate_openapi.py
+	zensical build
 
 docs-open: docs ## Build and open documentation in browser
-	open docs/_build/index.html
+	open site/index.html
+
+docs-serve: ## Regenerate OpenAPI spec and start the Zensical dev server with hot reload
+	$(PYTHON) scripts/generate_openapi.py
+	zensical serve
 
 # =============================================================================
 # Dependency management
@@ -105,5 +109,5 @@ upgrade: ## Upgrade all dependencies to latest versions older than COOLDOWN_DAYS
 # =============================================================================
 
 clean: ## Remove build artifacts, caches, and coverage files
-	rm -rf docs/_build htmlcov .coverage report.html .pytest_cache .mypy_cache .ruff_cache cdk.out
+	rm -rf site htmlcov .coverage report.html .pytest_cache .mypy_cache .ruff_cache cdk.out
 	find . -type d -name __pycache__ -exec rm -rf {} +

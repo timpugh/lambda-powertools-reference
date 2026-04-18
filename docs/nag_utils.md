@@ -1,9 +1,8 @@
 # NAG Utilities
 
-## API Reference
+The `hello_world.nag_utils` module holds the shared cdk-nag suppression
+helpers used by the three stacks.
 
-```{eval-rst}
-.. automodule:: hello_world.nag_utils
-   :members:
-   :show-inheritance:
-```
+## API reference
+
+::: hello_world.nag_utils

@@ -158,8 +158,8 @@ instance/
 # Scrapy stuff:
 .scrapy
 
-# Sphinx documentation
-docs/_build/
+# Documentation build output
+site/
 docs/openapi.json
 
 # PyBuilder

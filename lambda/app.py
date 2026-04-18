@@ -4,7 +4,7 @@ This module implements a serverless API endpoint that returns a greeting message
 It demonstrates the use of Powertools utilities including structured logging,
 X-Ray tracing, CloudWatch metrics, idempotency, SSM parameters, feature flags,
 Pydantic-backed request/response validation (with an OpenAPI spec generated
-at documentation-build time — see docs/generate_openapi.py), and Event Source
+at documentation-build time — see scripts/generate_openapi.py), and Event Source
 Data Classes.
 """
 
@@ -32,10 +32,10 @@ metrics = Metrics()
 
 # enable_validation=True wires Pydantic into the resolver. Request bodies and
 # response return types are validated against their model annotations, and
-# those same models drive the OpenAPI schema read by docs/generate_openapi.py.
+# those same models drive the OpenAPI schema read by scripts/generate_openapi.py.
 # We deliberately do NOT call app.enable_swagger() here — exposing the spec at
 # runtime would publish the full API surface to any caller. The spec is
-# instead rendered into Sphinx at documentation-build time.
+# instead rendered into Zensical at documentation-build time.
 app = APIGatewayRestResolver(
     cors=CORSConfig(allow_origin="*", max_age=300),
     enable_validation=True,
