@@ -10,11 +10,11 @@ extensions = [
     "myst_parser",
 ]
 
-# Copy docs/api.html (Redoc standalone wrapper) and docs/openapi.json (generated
-# pre-build by docs/generate_openapi.py) into the HTML output as-is, so the
-# built site serves a standalone Redoc page at /api.html that fetches the
-# sibling /openapi.json. See docs/api.html for the pinned-CDN + SRI-hash
-# rationale.
+# Copy docs/api.html (Scalar API Reference standalone wrapper) and
+# docs/openapi.json (generated pre-build by docs/generate_openapi.py) into
+# the HTML output as-is, so the built site serves a standalone Scalar page
+# at /api.html that fetches the sibling /openapi.json. See docs/api.html
+# for the pinned-CDN + SRI-hash rationale.
 html_extra_path = ["api.html", "openapi.json"]
 
 # Support both .rst and .md
