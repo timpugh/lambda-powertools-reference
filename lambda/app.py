@@ -65,7 +65,18 @@ class HelloResponse(BaseModel):
     message: str
 
 
-@app.get("/hello")
+@app.get(
+    "/hello",
+    summary="Return a greeting",
+    description=(
+        "Returns the greeting string configured in SSM Parameter Store. "
+        "When the `enhanced_greeting` AppConfig feature flag is enabled for "
+        "the caller's source IP, the response includes the feature flag's "
+        "configured suffix."
+    ),
+    response_description="A JSON object containing the resolved greeting.",
+    tags=["Greeting"],
+)
 @tracer.capture_method
 def hello() -> HelloResponse:
     """Handle GET /hello requests.

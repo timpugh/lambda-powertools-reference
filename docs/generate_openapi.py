@@ -26,15 +26,38 @@ os.environ.setdefault("AWS_DEFAULT_REGION", "us-east-1")
 
 # Import must follow sys.path mutation so the lambda/ directory is importable.
 from app import app  # noqa: E402
+from aws_lambda_powertools.event_handler.openapi.models import Server, Tag  # noqa: E402
 
 OUTPUT_PATH = Path(__file__).resolve().parent / "openapi.json"
+
+DESCRIPTION = """\
+Reference serverless API built on AWS Lambda Powertools, deployed behind
+API Gateway, CloudFront, and AWS WAF.
+
+The spec on this page is generated at documentation-build time from the
+live Pydantic models and route decorators in `lambda/app.py`. Any change
+to a route, a request body model, or a return-type annotation appears
+here on the next `make docs` run.
+"""
 
 
 def main() -> None:
     spec = app.get_openapi_json_schema(
         title="Hello World API",
         version="1.0.0",
-        description="Reference serverless API built on AWS Lambda Powertools",
+        description=DESCRIPTION,
+        servers=[
+            Server(
+                url="https://{apiId}.execute-api.{region}.amazonaws.com/prod",
+                description="API Gateway stage (substitute your deployed apiId and region)",
+            ),
+        ],
+        tags=[
+            Tag(
+                name="Greeting",
+                description="Endpoints that return the configured greeting.",
+            ),
+        ],
     )
     # Re-serialize through json to get stable, human-readable formatting that
     # diffs cleanly in PRs if the spec is ever committed.
