@@ -163,8 +163,9 @@ If you open the project in VS Code, the `.vscode/` directory pre-configures ruff
 Common commands are available via `make`. Run `make help` to see all targets:
 
 ```bash
-make install        # set up venv with all dependencies and pre-commit hooks
-make test           # run unit tests with coverage
+make install        # set up both venvs (.venv + .venv-lambda) and pre-commit hooks
+make test           # run unit tests with coverage (in .venv-lambda)
+make test-cdk       # run CDK stack assertion tests (in .venv)
 make test-integration  # run integration tests (requires deployed stack)
 make lint           # run all pre-commit hooks (ruff, mypy, pylint, bandit, xenon, pip-audit)
 make format         # format code with ruff
@@ -172,7 +173,7 @@ make typecheck      # run mypy type checking
 make security       # run bandit + pip-audit
 make docs           # build Zensical HTML docs
 make docs-open      # build and open docs in browser
-make compile        # regenerate all lock files from .in sources
+make lock           # regenerate uv.lock and lambda/requirements.txt from pyproject.toml
 make upgrade        # upgrade all dependencies (respects COOLDOWN_DAYS, default 7)
 make clean          # remove build artifacts, caches, and coverage files
 ```
@@ -185,6 +186,7 @@ To use the CDK, you need the following tools.
 * AWS CDK CLI - [Install the CDK CLI](https://docs.aws.amazon.com/cdk/v2/guide/getting-started.html)
 * AWS SAM CLI - [Install the SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html) - Required for local invocation and log tailing
 * [Python 3 installed](https://www.python.org/downloads/)
+* [uv](https://docs.astral.sh/uv/) — Python package and environment manager (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
 * A container runtime for bundling Lambda dependencies — either of:
   * [Finch](https://runfinch.com/) — AWS-supported, open-source, license-friendly (recommended)
   * [Docker](https://www.docker.com/) — drop-in alternative; CDK uses Docker by default when `CDK_DOCKER` is unset
@@ -205,21 +207,11 @@ export CDK_DOCKER=finch
 To set up and deploy your application for the first time, run the following in your shell:
 
 ```bash
-# Create and activate a virtual environment
-python3 -m venv .venv
-source .venv/bin/activate
-
-# Install pip-tools first (needed for pip-sync)
-pip install pip-tools
-
-# Install dev dependencies (CDK, linting, type checking) via pip-sync
-pip-sync requirements.txt
-
-# Add test and Lambda dependencies on top (additive — does not remove dev deps)
-pip install -r tests/requirements.txt -r lambda/requirements.txt
-
-# Shortcut for the three steps above (after activating the venv):
-# make install
+# Install both venvs and pre-commit hooks. Creates:
+#   .venv         — CDK workstation (cdk + test + lint + docs groups)
+#   .venv-lambda  — Lambda runtime   (lambda + test groups)
+# See "Project dependencies" below for why two venvs are required.
+make install
 
 # Start your container runtime (pick one from the block above)
 finch vm start           # if using Finch
@@ -574,7 +566,7 @@ Security follows the AWS [CDK security best practices guide](https://docs.aws.am
 | Layer | Tool | What it scans | When it runs |
 |---|---|---|---|
 | **Source code** | bandit | `lambda/` and `hello_world/` for security anti-patterns (hardcoded secrets, shell injection, unsafe deserialization, etc.) | Pre-commit hook on every commit; CI quality job |
-| **Dependencies** | pip-audit | All three requirements files for packages with known CVEs | Pre-commit hook on every commit; weekly Dependency Audit workflow |
+| **Dependencies** | pip-audit | Every dependency group in `uv.lock` for packages with known CVEs | Pre-commit hook on every commit; weekly Dependency Audit workflow |
 | **Infrastructure** | cdk-nag | CDK stacks against AWS Solutions, Serverless, NIST 800-53 R5, HIPAA Security, and PCI DSS 3.2.1 rules | `cdk synth` — findings are printed and fail synthesis if unsuppressed |
 
 These tools are complementary — no single one covers all three surfaces. Bandit catches code-level issues, pip-audit catches supply chain issues, and cdk-nag catches infrastructure misconfigurations.
@@ -644,7 +636,7 @@ pre-commit run --all-files
 | `xenon` | local | Enforces cyclomatic complexity thresholds on `lambda/` (max absolute: B, module: A, average: A) |
 | `pip-audit` | local | Scans all installed dependencies for known CVEs (runs on every commit) |
 
-**Version pinning.** The `ruff` and `mypy` hooks are pinned to specific versions in `.pre-commit-config.yaml` (`rev:` for ruff, `additional_dependencies:` for mypy's `boto3-stubs` and `aws-cdk-lib`). These pins must stay in sync with the corresponding versions in `requirements.in` — if Dependabot bumps ruff or boto3-stubs in the lockfile, update `.pre-commit-config.yaml` to match. A version mismatch means pre-commit and the local venv would run different tool versions, which can cause "passes locally, fails in CI" drift.
+**Version pinning.** The `ruff` and `mypy` hooks are pinned to specific versions in `.pre-commit-config.yaml` (`rev:` for ruff, `additional_dependencies:` for mypy's `boto3-stubs` and `aws-cdk-lib`). These pins must stay in sync with the corresponding versions resolved in `uv.lock` — if Dependabot bumps ruff or boto3-stubs in the lock, update `.pre-commit-config.yaml` to match. A version mismatch means pre-commit and the local venv would run different tool versions, which can cause "passes locally, fails in CI" drift.
 
 ## GitHub Actions
 
@@ -654,17 +646,17 @@ Four workflows are configured:
 |---|---|---|
 | **CI** | Push / PR to `main` | Three jobs: pre-commit hooks (`quality`), pytest unit tests (`test`), CDK synth + stack assertion tests (`cdk-check`) |
 | **Docs** | Push to `main` | Builds Zensical docs and deploys to GitHub Pages |
-| **Dependency Audit** | Every Monday 9am UTC | Runs `pip-audit` across all requirements files |
+| **Dependency Audit** | Every Monday 9am UTC | Runs `pip-audit` against each dependency group exported from `uv.lock` |
 | **Dependabot Auto-merge** | Dependabot PRs | Approves and auto-merges GitHub Actions version updates when CI passes |
 
 All three CI jobs must pass before anything can merge to `main` (branch protection).
 
-The CI installs dependencies with `pip-sync` to match the local dev workflow exactly:
-- `quality` job: `pip-sync requirements.txt`
-- `test` job: `pip-sync tests/requirements.txt lambda/requirements.txt`
-- `cdk-check` job: `pip-sync requirements.txt` (CDK) + `pip install pytest pytest-mock` (test runner, added separately to avoid the `attrs` version conflict between CDK and Lambda dependencies) + CDK CLI via `npm install -g aws-cdk`
+The CI uses [uv](https://docs.astral.sh/uv/) to install dependencies from the single `uv.lock` at the repo root. Each job syncs only the groups it needs:
+- `quality` job: `uv sync --group cdk --group test --group lint --group docs` (runs pre-commit hooks, which cover every tool across every group)
+- `test` job: `uv sync --only-group lambda --only-group test` into `.venv-lambda` via `UV_PROJECT_ENVIRONMENT=.venv-lambda` — isolates Powertools' `attrs>=26` from CDK's `attrs<26`
+- `cdk-check` job: `uv sync --group cdk --group test` (CDK + pytest) + CDK CLI via `npm install -g aws-cdk`
 
-The `cdk-check` job runs `cdk synth` to catch unsuppressed cdk-nag findings, then runs `tests/cdk/test_stacks.py` which uses `aws_cdk.assertions.Template` to verify key security properties of each synthesized stack (KMS encryption, DynamoDB PITR, API Gateway caching, CloudFront TLS version, etc.). These tests live under `tests/cdk/` rather than `tests/unit/` so the unit-test autouse fixture (which mocks Powertools internals) does not apply — the cdk-check job intentionally does not install Powertools to avoid the `attrs` version conflict. Asset bundling (Docker) is skipped via the `aws:cdk:bundling-stacks` context key so the job runs without Docker build time.
+The `cdk-check` job runs `cdk synth` to catch unsuppressed cdk-nag findings, then runs `tests/cdk/test_stacks.py` which uses `aws_cdk.assertions.Template` to verify key security properties of each synthesized stack (KMS encryption, DynamoDB PITR, API Gateway caching, CloudFront TLS version, etc.). These tests live under `tests/cdk/` rather than `tests/unit/` so the unit-test autouse fixture (which mocks Powertools internals) does not apply — the cdk-check job intentionally omits Powertools to avoid the `attrs` version conflict. Asset bundling (Docker) is skipped via the `aws:cdk:bundling-stacks` context key so the job runs without Docker build time.
 
 ### Dependabot
 
@@ -673,7 +665,7 @@ Dependabot is configured in `.github/dependabot.yml` to check for updates every 
 | Ecosystem | What it checks | Auto-merge? |
 |-----------|----------------|-------------|
 | `github-actions` | Workflow YAML for newer action versions (e.g. `actions/checkout@v4` → `v5`) | Patch and minor updates auto-merge via the `dependabot-auto-merge` workflow once CI passes; major updates require human review |
-| `pip` | All three Python requirements tiers (`lambda/`, `tests/`, `/`) — regenerates lock files with hashes in place | No — pip PRs are held for human review |
+| `uv` | `pyproject.toml` + `uv.lock` — every dependency group in one lock file, regenerated atomically | No — Python PRs are held for human review |
 
 For GitHub Actions patch and minor updates, the `dependabot-auto-merge` workflow:
 1. Confirms the PR is a GitHub Actions ecosystem update
@@ -687,64 +679,19 @@ If CI fails on a Dependabot PR (any ecosystem), it stays open for investigation 
 
 **Repo setting required for auto-merge to work.** GitHub repositories ship with GitHub Actions blocked from approving pull requests by default. Until this is changed, the `dependabot-auto-merge` workflow will fail with `GraphQL: GitHub Actions is not permitted to approve pull requests` and even GitHub Actions PRs must be merged manually. Enable it once under **Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests"**. This only needs to be done a single time per repo. Leave the **Workflow permissions** radio set to **Read repository contents and packages permissions** (the safer default) — every workflow in this repo declares its own explicit `permissions:` block, so the elevated `Read and write permissions` default is not needed. See "Least-privilege workflow permissions" in the supply-chain hardening section below.
 
-#### Python (`pip`) updates and the pip-tools constraint chain
+#### Python (`uv`) updates
 
-The three Python requirements tiers are chained together via `pip-compile` constraint files:
+All Python dependencies live in a single `pyproject.toml` with five groups (`lambda`, `cdk`, `test`, `lint`, `docs`) and resolve into one `uv.lock`. The `lambda` and `cdk` groups are declared mutually exclusive via `[tool.uv.conflicts]` so uv records two valid resolutions for the `attrs` conflict inside the same lock file and installs the right one into each venv at sync time — see the "attrs version conflict" note in Design decisions.
 
-```
-lambda/requirements.in  →  lambda/requirements.txt
-                           ↓ (-c constraint)
-tests/requirements.in   →  tests/requirements.txt
-                           ↓ (-c constraint)
-requirements.in         →  requirements.txt
-```
+**One ecosystem entry covers everything.** Dependabot's `uv` ecosystem regenerates `pyproject.toml` + `uv.lock` together in a single PR, so the old pip-tools constraint chain (three `.in` files compiled in order, downstream-recompile dance when shared packages moved) no longer exists. Every group is updated atomically from a single lock regeneration.
 
-When a package shared across tiers changes version, all downstream lock files must be recompiled in order (lambda → tests → dev). The `make compile` target does this in one step.
+**Grouped updates collapse the PR volume.** The uv ecosystem entry in `dependabot.yml` defines `groups:` that bundle related packages into a single PR — `aws-cdk*`/`constructs` update together, `aws-*`/`boto*`/`botocore`/`s3transfer` update together, `pytest` and its plugins update together, docs tooling together, linting tooling together, all remaining patch bumps roll into one weekly "patches" PR. Within a group, Dependabot regenerates `uv.lock` in one shot, so the cross-package version skew that would otherwise hit boto3+botocore+aws-lambda-powertools (when each is bumped in isolation) cannot happen. Major and minor bumps outside these groups still get individual PRs so each changelog can be reviewed on its own.
 
-**Dependabot handles each directory independently** and does not automatically re-run the downstream compiles. If Dependabot bumps a package in `lambda/requirements.in`, it regenerates `lambda/requirements.txt` correctly — but `tests/requirements.txt` and `requirements.txt` may still reference stale pins from the old lambda file. In practice, this only matters when the bumped package appears in the transitive tree of the downstream tiers.
+**Merge flow.** A Dependabot uv PR updates `pyproject.toml` + `uv.lock` in lockstep. CI re-syncs each job's venv from the new lock, runs the test suite against both resolutions (CDK venv in `cdk-check`, Lambda venv in `test`), and the PR merges manually after review. There is no per-tier recompile step, no Case 1/2/3 handling — the single lock file is always internally consistent.
 
-**Grouped updates collapse the PR volume.** Each pip ecosystem entry in `dependabot.yml` defines `groups:` that bundle related packages into a single PR — `aws-*`/`boto*`/`botocore` always update together, `pytest` and its plugins update together, all other patch bumps roll into one weekly "patches" PR. Within a group, Dependabot regenerates the entire lock file in one shot, so the cross-package version skew that would otherwise hit boto3+botocore+aws-lambda-powertools (when each is bumped in isolation) cannot happen inside a single tier. Major and minor bumps that are not patches still get individual PRs so each changelog can be reviewed on its own.
-
-**Case 1 — single package confined to one tier.** When a Dependabot PR bumps a package that only appears in one directory (e.g. `ruff` in `/`, `pytest` in `/tests`), merging it directly is enough — nothing downstream depends on it. These PRs go green on CI and can be squash-merged as-is.
-
-**Case 2 — a package that cascades down the chain.** When Dependabot bumps a package in `lambda/requirements.in` that is also transitively present in `tests/` or `/`, its PR regenerates only its own lock file — the downstream lock files still reference the stale pin. The 30-second fix is to recompile the downstream tiers locally:
-
-```bash
-gh pr checkout <PR-number>
-make compile
-git add lambda/requirements.txt tests/requirements.txt requirements.txt
-git commit -m "chore: recompile downstream lock files"
-git push
-```
-
-**Case 3 — cross-cutting packages that Dependabot splits across directories.** Packages like `boto3` and `botocore` live as top-level pins in both `lambda/requirements.in` and `tests/requirements.in`. Dependabot opens **one PR per directory** (e.g. `boto3` in lambda/, `botocore` in tests/), but `pip-sync tests/requirements.txt lambda/requirements.txt` in the CI test job refuses to install mismatched versions — so neither PR can land in isolation and both fail CI. `gh pr checkout` on either one doesn't fix the other.
-
-The fix is to land them atomically from a single local commit rather than through Dependabot PRs at all:
-
-```bash
-# Close the stuck Dependabot PRs (they cannot be rebased into a consistent state)
-gh pr close <boto3-PR> --comment "Superseded by local recompile"
-gh pr close <botocore-PR> --comment "Superseded by local recompile"
-
-# Bump the pin in each .in file, then recompile each tier in order
-# (editing lambda/requirements.in and tests/requirements.in to the new version)
-pip-compile --generate-hashes --upgrade-package boto3 --upgrade-package botocore \
-    lambda/requirements.in -o lambda/requirements.txt
-pip-compile --generate-hashes --allow-unsafe --upgrade-package boto3 --upgrade-package botocore \
-    tests/requirements.in -o tests/requirements.txt
-pip-compile --generate-hashes --allow-unsafe --upgrade-package boto3 --upgrade-package botocore \
-    requirements.in -o requirements.txt
-
-git add lambda/requirements.in lambda/requirements.txt tests/requirements.in tests/requirements.txt requirements.txt
-git commit -m "build(deps): bump boto3 and botocore across all three lockfiles"
-git push
-```
+**Regenerating `lambda/requirements.txt`.** The packaged Lambda still installs from a flat `requirements.txt` at deploy time (CDK's `PythonFunction` construct expects one). That file is generated from `uv.lock` via `uv export --only-group lambda --no-emit-project` and is treated as a build artifact, not a source of truth. `make lock` regenerates both `uv.lock` and `lambda/requirements.txt` together so they never drift.
 
 **Useful Dependabot commands.** When a PR becomes stale relative to `main` (shown as `BEHIND` in `gh pr view`), comment `@dependabot rebase` on the PR to trigger a fresh rebase and CI run. Other useful commands include `@dependabot recreate` (regenerates the PR from scratch) and `@dependabot ignore this version` (skip a specific release). The full command list is at <https://docs.github.com/en/code-security/dependabot/working-with-dependabot/managing-pull-requests-for-dependency-updates>.
-
-We intentionally leave the downstream-recompile step manual rather than automating it with a `pull_request_target` workflow: the manual path is ~30 seconds a few times a month, and a `pull_request_target` workflow that pushes back to PR branches carries a non-trivial security surface that is not worth the convenience trade-off for a solo reference project. If this repo ever takes external contributions, the calculus changes and the workflow becomes worth building.
-
-**`attrs` is pinned and ignored.** The `attrs` package has an unresolvable version conflict between CDK (`25.4.0`) and Lambda Powertools (`26.1.0`). Dependabot is configured to ignore `attrs` in all three directories so it does not open unresolvable upgrade PRs — see the "attrs version conflict" note in Design decisions.
 
 #### Supply-chain hardening
 
@@ -760,11 +707,11 @@ This repo layers six defenses against the supply-chain attack patterns described
 
 Tag references are mutable — a compromised maintainer account can rewrite `v6` to point at malicious code, and every workflow that said `@v6` instantly runs the malicious version on the next trigger. This is exactly what happened to `tj-actions/changed-files` in March 2025, where attackers rewrote the `v35` and `v38` tags to exfiltrate CI secrets from thousands of repos within an hour. SHA pins are immutable — a re-tagged release becomes a new commit, and our pin simply ignores it until a human updates it. Dependabot still opens update PRs for SHA-pinned actions; the diff replaces both the SHA and the version comment in one shot.
 
-**3. Hash-locked pip installs.** All three lock files are generated with `pip-compile --generate-hashes`, so every dependency is pinned to a SHA256. Even if an attacker uploads a malicious version under an existing version number (e.g. after yanking the legitimate one), `pip install` refuses to install it because the hash does not match.
+**3. Hash-locked installs.** `uv.lock` records a SHA256 for every wheel and sdist it resolves, and `uv sync` refuses to install anything whose on-disk hash does not match. The `lambda/requirements.txt` artifact exported from the lock for the deployed Lambda is generated with hashes too. Even if an attacker uploads a malicious version under an existing version number (e.g. after yanking the legitimate one), the install refuses it because the hash does not match.
 
-**4. Restricted auto-merge.** Auto-merge is scoped to patch and minor GitHub Actions updates only (see above). pip updates never auto-merge, regardless of the update type, because they ship to production Lambda. Majors in either ecosystem require human review.
+**4. Restricted auto-merge.** Auto-merge is scoped to patch and minor GitHub Actions updates only (see above). Python (uv) updates never auto-merge, regardless of the update type, because they ship to production Lambda. Majors in either ecosystem require human review.
 
-**5. Local pip cooldown on `make upgrade`.** Dependabot's cooldown protects every dependency change that lands via a PR, but `make upgrade` runs locally on a developer laptop and bypasses Dependabot entirely. The Makefile mirrors the same defense by passing pip's `--uploaded-prior-to` flag to `pip-compile --upgrade`, filtering out any package version uploaded in the last `COOLDOWN_DAYS` days (default 7). Override at the command line if you need to pull a fresher version: `make upgrade COOLDOWN_DAYS=1`. The cooldown is intentionally **only** applied to `upgrade`, not `compile`. `compile` reproduces decisions already encoded in the `.in` files and the existing lockfile — it cannot introduce a brand-new version, so cooldown is unnecessary and would actively conflict with freshly-bumped pins. `upgrade` is the only target where new versions enter the project and is the only place a fresh malicious release can land. Disable entirely with `COOLDOWN_DAYS=0`.
+**5. Local cooldown on `make upgrade`.** Dependabot's cooldown protects every dependency change that lands via a PR, but `make upgrade` runs locally on a developer laptop and bypasses Dependabot entirely. The Makefile mirrors the same defense by passing uv's `--exclude-newer` flag to `uv lock --upgrade`, filtering out any package version uploaded after a cutoff computed from `COOLDOWN_DAYS` (default 7). Override at the command line if you need to pull a fresher version: `make upgrade COOLDOWN_DAYS=1`. The cooldown is intentionally **only** applied to `upgrade`, not `lock`. `lock` reproduces decisions already encoded in `pyproject.toml` and the existing `uv.lock` — it cannot introduce a brand-new version, so cooldown is unnecessary and would actively conflict with freshly-bumped pins. `upgrade` is the only target where new versions enter the project and is the only place a fresh malicious release can land. Disable entirely with `COOLDOWN_DAYS=0`.
 
 **6. Least-privilege workflow permissions.** Every workflow under `.github/workflows/` declares an explicit `permissions:` block scoped to exactly what it needs, and the repo-level default (`Settings → Actions → General → Workflow permissions`) is set to `read` rather than `write`. The combination means that if a malicious dependency runs inside a CI job, the `GITHUB_TOKEN` it sees has the minimum authority necessary — `ci.yml`, `dependency-audit.yml`, and `docs.yml`'s `build` job all run with `contents: read` and nothing else. Only two places escalate beyond read: `docs.yml`'s `deploy` job adds `pages: write` + `id-token: write` for GitHub Pages OIDC deployment, and `dependabot-auto-merge.yml` adds `contents: write` + `pull-requests: write` so it can approve and merge Dependabot PRs (and is gated on `github.actor == 'dependabot[bot]'` plus a patch/minor update-type check). Permissions are declared at the **job** level wherever a workflow has heterogeneous needs (docs.yml's build vs deploy) and at the **workflow** level otherwise. The repo-level `read` default acts as defense-in-depth: if any future workflow is added without an explicit `permissions:` block, it inherits `read` instead of write-everything. The repo separately keeps `can_approve_pull_request_reviews` enabled — that toggle is independent of the default and is required for the auto-merge workflow's `gh pr review --approve` call to succeed.
 
@@ -780,13 +727,12 @@ Everything else in this section is *prevention*; honeytokens are *detection*. Th
 
 #### Why not Renovate?
 
-[Renovate](https://docs.renovatebot.com/) is an alternative to Dependabot that handles multi-file Python setups more gracefully. Specifically:
+[Renovate](https://docs.renovatebot.com/) is an alternative to Dependabot that historically handled multi-file Python setups more gracefully. With the migration to a single `uv.lock`, most of that advantage no longer applies — Dependabot's uv ecosystem regenerates the lock atomically in one PR. The remaining differences are at the edges:
 
-- Renovate understands `pip-compile` constraint chains natively and recompiles downstream lock files in the correct order automatically — no manual `make compile` step, no bespoke workflow.
-- Renovate supports richer grouping (e.g., "group all AWS packages into one PR") and auto-merge rules scoped by update type (patch/minor/major).
+- Renovate supports richer grouping rules (e.g., regex-based bundling, per-manager overrides) and auto-merge rules scoped by update type (patch/minor/major) for Python PRs.
 - Renovate runs as a GitHub App, so it is zero-infrastructure.
 
-This project uses Dependabot rather than Renovate because Dependabot is the GitHub-native default, already integrated into the repo for GitHub Actions updates, and the manual `make compile` step is a minor cost at the current scale. If you extend this pattern to a production repo with more frequent Python churn — or if you want auto-merge for non-major pip updates — Renovate is the lower-friction choice and worth evaluating. The configuration lives in `renovate.json` at the repo root; the GitHub App handles the rest.
+This project uses Dependabot because it is the GitHub-native default and already integrated into the repo for GitHub Actions updates. The `uv` ecosystem support closed the gap that previously made Renovate compelling for the pip-tools constraint chain. If you extend this pattern to a production repo that wants auto-merge for non-major Python updates, Renovate is still the lower-friction choice.
 
 ## CDK security checks
 
@@ -1087,21 +1033,31 @@ make docs-serve
 
 ## Project dependencies
 
-Dependencies are managed with [pip-tools](https://pip-tools.readthedocs.io/). Each dependency group has a `.in` file (direct dependencies you maintain) and a `.txt` file (fully resolved with transitive dependencies and hashes, generated by `pip-compile`).
+Dependencies are managed with [uv](https://docs.astral.sh/uv/) in [project mode](https://docs.astral.sh/uv/concepts/projects/). All direct dependencies live in `pyproject.toml` under five [dependency groups](https://peps.python.org/pep-0735/) (PEP 735); the fully resolved graph — with hashes for every wheel and sdist — lives in a single `uv.lock` at the repo root.
 
-- `requirements.in` / `requirements.txt` — CDK, linting, static analysis, and dev tooling (constrained by `tests/requirements.txt`)
-- `tests/requirements.in` / `tests/requirements.txt` — pytest and test plugins (constrained by `lambda/requirements.txt`)
-- `lambda/requirements.in` / `lambda/requirements.txt` — Lambda runtime dependencies (packaged with the function at deploy time)
+| Group | Purpose | Installed into |
+|---|---|---|
+| `lambda` | Lambda runtime dependencies (Powertools, boto3, X-Ray SDK) | `.venv-lambda` |
+| `cdk` | CDK core, constructs, cdk-nag, cdk-monitoring-constructs | `.venv` |
+| `test` | pytest, coverage, xdist, mock, html, timeout, randomly | both venvs |
+| `lint` | ruff, mypy, pylint, bandit, radon, xenon, pre-commit, pip-audit, boto3-stubs | `.venv` |
+| `docs` | zensical + mkdocstrings for the generated site | `.venv` |
 
-Constraint files (`-c`) ensure shared packages like `boto3` resolve to the same version across all environments, preventing drift.
+**Two venvs, one lock file.** The `lambda` and `cdk` groups are declared mutually exclusive in `pyproject.toml`:
 
-To regenerate the lock files after editing a `.in` file, compile in order (lambda → tests → dev):
+```toml
+[tool.uv]
+conflicts = [[{group = "lambda"}, {group = "cdk"}]]
+```
+
+This lets uv record **both** valid resolutions of the `attrs` conflict (25.4.0 for CDK, 26.1.0 for Powertools) inside a single `uv.lock` and install the correct one into each venv at sync time. The CDK-side venv lives at `.venv` and the Lambda-side venv lives at `.venv-lambda`; the Makefile switches between them by setting `UV_PROJECT_ENVIRONMENT=.venv-lambda` for Lambda-side commands. `make install` provisions both.
+
+**`lambda/requirements.txt` is a generated artifact.** CDK's `PythonFunction` construct bundles Lambda dependencies from a flat `requirements.txt` at deploy time, so `make lock` runs `uv export --only-group lambda --no-emit-project --format requirements.txt` after every `uv lock` to keep the file in step. Never hand-edit it.
+
+To regenerate the lock after editing `pyproject.toml`:
 
 ```bash
-pip-compile --generate-hashes lambda/requirements.in -o lambda/requirements.txt
-pip-compile --generate-hashes --allow-unsafe tests/requirements.in -o tests/requirements.txt
-pip-compile --generate-hashes --allow-unsafe requirements.in -o requirements.txt
-# Shortcut: make compile
+make lock    # runs `uv lock` + `uv export` for the Lambda runtime file
 ```
 
 To upgrade all dependencies:
@@ -1116,18 +1072,17 @@ make upgrade COOLDOWN_DAYS=1    # near-immediate — only the last 24 hours filt
 make upgrade COOLDOWN_DAYS=0    # disable cooldown entirely
 ```
 
-`make upgrade` passes pip's `--uploaded-prior-to` flag to `pip-compile --upgrade` so brand-new PyPI releases (the window in which malicious versions typically get caught and yanked) are not pulled into the lockfiles. See "Local pip cooldown on `make upgrade`" in the supply-chain hardening section for the full rationale.
+`make upgrade` passes uv's `--exclude-newer` flag to `uv lock --upgrade` so brand-new PyPI releases (the window in which malicious versions typically get caught and yanked) are not pulled into the lockfile. See "Local cooldown on `make upgrade`" in the supply-chain hardening section for the full rationale.
 
-To install and keep your venv in sync with dev dependencies:
+To install or re-sync both venvs from the lock:
 
 ```bash
-pip-sync requirements.txt
-pip install -r tests/requirements.txt -r lambda/requirements.txt
+make install    # provisions .venv (CDK + test + lint + docs) and .venv-lambda (lambda + test)
 ```
 
-`pip-sync` is used for the dev context because it removes stale packages not in the lock file. Test deps are added with `pip install -r` instead — using `pip-sync` for both contexts would remove dev packages, corrupting the venv. CI uses separate jobs so each runs `pip-sync` against a single context cleanly.
+`uv sync` only installs what is locked — no stale packages, no drift. Adding a dependency is `uv add <pkg> --group <group>` (updates `pyproject.toml` and `uv.lock` in one step).
 
-### `lambda/requirements.txt` — Lambda runtime
+### `lambda` group — Lambda runtime
 
 | Library | Purpose |
 |---|---|
@@ -1135,7 +1090,7 @@ pip install -r tests/requirements.txt -r lambda/requirements.txt
 | `aws-xray-sdk` | Required by Powertools Tracer for X-Ray instrumentation |
 | `boto3` | AWS SDK, version-locked in the deployment package to avoid depending on the Lambda runtime's bundled version |
 
-### `requirements.txt` — CDK and dev tooling
+### `cdk` group — CDK and infrastructure
 
 | Library | Purpose |
 |---|---|
@@ -1144,20 +1099,29 @@ pip install -r tests/requirements.txt -r lambda/requirements.txt
 | `aws-cdk-aws-lambda-python-alpha` | `PythonFunction` construct that bundles Lambda dependencies in a container |
 | `cdk-monitoring-constructs` | Auto-generates CloudWatch dashboards and alarms for Lambda and API Gateway |
 | `cdk-nag` | Runs AWS Solutions security checks against the CDK stack during synthesis |
+
+### `lint` group — Linting and static analysis
+
+| Library | Purpose |
+|---|---|
 | `ruff` | Fast Python linter and formatter (configured in `pyproject.toml`) |
 | `mypy` | Static type checker (configured in `pyproject.toml`) |
 | `pylint` | Design and complexity checks complementing ruff (configured in `pyproject.toml`) |
 | `bandit` | Security-focused static analysis (configured in `.bandit`) |
 | `radon` | Computes code complexity metrics (cyclomatic complexity, maintainability index) |
 | `xenon` | Enforces complexity thresholds, fails if code exceeds limits |
-| `pip-audit` | Scans installed dependencies for known vulnerabilities |
+| `pip-audit` | Scans exported requirements files for known vulnerabilities |
 | `pre-commit` | Git hook framework that runs linters and formatters on each commit |
 | `boto3-stubs` | Type stubs for boto3, enables mypy to type-check AWS SDK calls |
+
+### `docs` group — Documentation site
+
+| Library | Purpose |
+|---|---|
 | `zensical` | Static-site documentation generator (MkDocs-Material successor), builds HTML from markdown in `docs/` (configured in `zensical.toml`) |
 | `mkdocstrings` + `mkdocstrings-python` | Renders Python module/class/function reference from Google-style docstrings via the `::: module.path` directive |
-| `pip-tools` | Generates fully resolved, hash-verified `requirements.txt` files from `.in` source files |
 
-### `tests/requirements.txt` — Testing
+### `test` group — Testing
 
 | Library | Purpose |
 |---|---|
@@ -1176,7 +1140,7 @@ pip install -r tests/requirements.txt -r lambda/requirements.txt
 
 **`cdk.out/` is not committed** — this directory contains the synthesized CloudFormation template and bundled Lambda assets generated by `cdk synth`. It is gitignored because it is always reproducible from source and can be large. Run `cdk synth` locally to regenerate it before deploying or invoking locally with SAM.
 
-**attrs version conflict** — `requirements.txt` (dev) pins `attrs==25.4.0` for CDK compatibility, while `lambda/requirements.txt` pins `attrs==26.1.0` for Powertools. These two versions cannot coexist in a single environment. This is why the CI is split into separate `quality` and `test` jobs, and why local test deps are installed with `pip install -r` (additive) rather than `pip-sync` (destructive).
+**attrs version conflict** — CDK (via `jsii`) pins `attrs<26`, while `aws-lambda-powertools[all]>=3.27` requires `attrs>=26`. These two versions cannot coexist in a single Python environment. The project handles this by declaring the `lambda` and `cdk` dependency groups mutually exclusive in `pyproject.toml` (`[tool.uv.conflicts]`), which lets uv record both resolutions in a single `uv.lock` (25.4.0 for the CDK side, 26.1.0 for the Lambda side) and install each into its own venv: `.venv` for CDK work and `.venv-lambda` for Lambda runtime code. CI splits into separate `quality`/`cdk-check` (CDK venv) and `test` (Lambda venv) jobs for the same reason.
 
 **SSM parameter name is CDK-generated** — the greeting parameter's name is auto-generated by CDK (derived from the construct path, e.g. `HelloWorld-us-east-1AppGreetingParameterD5E6E64F`) rather than set explicitly. The Lambda reads the name from the `GREETING_PARAM_NAME` env var, which CDK wires up from `greeting_param.parameter_name`, so the name never needs to be human-memorable. This follows the CDK "use generated resource names" best practice — see [Stack and construct composition](#stack-and-construct-composition).
 

@@ -1,7 +1,86 @@
 [project]
 name = "hello-world"
 version = "0.1.0"
-requires-python = ">=3.12"
+requires-python = ">=3.13"
+# No runtime dependencies at the project level — see [dependency-groups] below.
+# The project splits into two resolution environments because CDK and Powertools
+# require incompatible `attrs` versions (CDK pulls attrs<26 via jsii, Powertools
+# pulls attrs>=26). [tool.uv.conflicts] below declares the `lambda` and `cdk`
+# groups as mutually exclusive so uv locks both resolutions in one uv.lock.
+dependencies = []
+
+# =============================================================================
+# Dependency groups (PEP 735) — resolved together by `uv lock`, installed
+# selectively with `uv sync --group <name>`. The `lambda` and `cdk` groups
+# are declared as conflicts in [tool.uv] and must never be installed into
+# the same venv.
+# =============================================================================
+[dependency-groups]
+# Lambda runtime — ships in the deployment bundle AND is installed locally
+# for unit tests that import `lambda/app.py`.
+lambda = [
+    "aws-lambda-powertools[all]==3.27.0",
+    "aws-xray-sdk==2.15.0",
+    "boto3==1.42.87",
+]
+
+# CDK infrastructure — used by `app.py`, `hello_world/`, and the CDK stack
+# assertion tests. Conflicts with `lambda` at the `attrs` pin (CDK requires
+# attrs<26 via jsii; Powertools requires attrs>=26).
+cdk = [
+    "aws-cdk-lib==2.248.0",
+    "constructs==10.6.0",
+    "aws-cdk-aws-lambda-python-alpha==2.248.0a0",
+    "cdk-monitoring-constructs==9.22.2",
+    "cdk-nag==2.37.55",
+]
+
+# Test runner — environment-agnostic; pairs with either `lambda` (unit tests,
+# integration tests) or `cdk` (stack assertion tests).
+test = [
+    "pytest==9.0.3",
+    "pytest-env==1.6.0",
+    "pytest-cov==7.1.0",
+    "pytest-xdist==3.8.0",
+    "pytest-mock==3.15.1",
+    "pytest-html==4.2.0",
+    "pytest-timeout==2.4.0",
+    "pytest-randomly==4.0.1",
+    "requests==2.33.1",
+]
+
+# Linting / static analysis / supply-chain checks — environment-agnostic.
+lint = [
+    "radon==6.0.1",
+    "xenon==0.9.3",
+    "mypy==1.20.0",
+    "ruff==0.15.10",
+    "pylint==4.0.5",
+    "bandit==1.9.4",
+    "pip-audit==2.10.0",
+    "pre-commit==4.5.1",
+    "boto3-stubs==1.42.88",
+]
+
+# Documentation build — used only by `make docs`. The Zensical static site
+# generator is pre-1.0, so versions are pinned exactly.
+docs = [
+    "zensical==0.0.33",
+    "mkdocstrings==1.0.4",
+    "mkdocstrings-python==2.0.3",
+]
+
+# =============================================================================
+# uv configuration
+# =============================================================================
+[tool.uv]
+# The `lambda` and `cdk` groups resolve `attrs` to incompatible versions.
+# Declaring them as conflicts lets uv produce one uv.lock that contains both
+# resolutions, installable independently via `uv sync --only-group lambda`
+# or `uv sync --group cdk`.
+conflicts = [
+    [{ group = "lambda" }, { group = "cdk" }],
+]
 
 # =============================================================================
 # Ruff — fast Python linter and formatter (replaces flake8, isort, and black)

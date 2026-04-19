@@ -15,12 +15,21 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
         with:
-          python-version: "3.13"
+          enable-cache: true
 
+      # pip-audit is environment-agnostic — it reads requirements files directly.
+      # Export each conflicting group to a requirements.txt and audit both, so
+      # the `lambda` and `cdk` resolutions are covered by a single job.
       - name: Install pip-audit
-        run: pip install pip-audit
+        run: uv sync --only-group lint
+
+      - name: Export each group to a requirements file
+        run: |
+          uv export --only-group cdk  --no-emit-project --format requirements.txt -o /tmp/req-cdk.txt
+          uv export --only-group lambda --no-emit-project --format requirements.txt -o /tmp/req-lambda.txt
+          uv export --only-group test --no-emit-project --format requirements.txt -o /tmp/req-test.txt
 
       - name: Audit dependencies
-        run: pip-audit -r requirements.txt -r tests/requirements.txt -r lambda/requirements.txt
+        run: uv run pip-audit -r /tmp/req-cdk.txt -r /tmp/req-lambda.txt -r /tmp/req-test.txt

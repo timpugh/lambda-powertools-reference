@@ -21,24 +21,24 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
         with:
-          python-version: "3.13"
-          cache: pip
+          enable-cache: true
 
-      - name: Install pip-tools
-        run: pip install pip-tools
+      # The OpenAPI generator imports lambda/app.py (needs Powertools) and
+      # Zensical is in the docs group (installed in .venv). Install both
+      # environments so each step runs in the one that has its imports.
+      - name: Install Lambda env (for OpenAPI generation)
+        run: UV_PROJECT_ENVIRONMENT=.venv-lambda uv sync --only-group lambda --only-group test
 
-      - name: Install dependencies
-        run: |
-          pip-sync requirements.txt
-          pip install -r lambda/requirements.txt
+      - name: Install CDK env (for Zensical build)
+        run: uv sync --group cdk --group docs
 
       - name: Generate OpenAPI spec
-        run: python scripts/generate_openapi.py
+        run: UV_PROJECT_ENVIRONMENT=.venv-lambda uv run python scripts/generate_openapi.py
 
       - name: Build docs
-        run: zensical build
+        run: uv run zensical build
 
       - name: Upload pages artifact
         uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b  # v4.0.0

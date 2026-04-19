@@ -20,74 +20,19 @@ updates:
       semver-minor-days: 7
       semver-patch-days: 3
 
-  # Python — Lambda runtime dependencies (lambda/requirements.in → lambda/requirements.txt)
-  # Dependabot auto-detects pip-compile mode from the lock file header and
-  # regenerates the .txt file (with hashes) whenever it bumps a pin in the .in.
+  # Python — all dependency groups in a single uv.lock
+  #
+  # This project migrated from three pip-compile lock files (dev/test/lambda)
+  # to a single uv.lock that covers every group in pyproject.toml, with
+  # `[tool.uv.conflicts]` declaring the `lambda` and `cdk` groups as mutually
+  # exclusive. Dependabot's uv ecosystem updates pyproject.toml + uv.lock
+  # together, so one entry here covers every group at once.
   #
   # Grouped updates collapse the weekly PR volume from one-per-package to
-  # one-per-group. Each group regenerates the lock file as a single atomic
-  # update, which prevents the cross-package version skew that hits
+  # one-per-group. Each group regenerates the lock as a single atomic update,
+  # which prevents the cross-package version skew that hits
   # boto3/botocore/aws-lambda-powertools when they are bumped individually.
-  - package-ecosystem: "pip"
-    directory: "/lambda"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:00"
-      timezone: "America/New_York"
-    cooldown:
-      default-days: 5
-      semver-major-days: 14
-      semver-minor-days: 7
-      semver-patch-days: 3
-    ignore:
-      # attrs is pinned at 26.1.0 for Powertools and cannot be upgraded without
-      # breaking CDK (which requires 25.4.0). This is a documented, intentional
-      # conflict — see README "attrs version conflict" section.
-      - dependency-name: "attrs"
-    groups:
-      aws:
-        patterns:
-          - "aws-*"
-          - "boto*"
-          - "botocore*"
-          - "s3transfer"
-      patches:
-        update-types:
-          - "patch"
-
-  # Python — test dependencies (tests/requirements.in → tests/requirements.txt)
-  - package-ecosystem: "pip"
-    directory: "/tests"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:00"
-      timezone: "America/New_York"
-    cooldown:
-      default-days: 5
-      semver-major-days: 14
-      semver-minor-days: 7
-      semver-patch-days: 3
-    ignore:
-      - dependency-name: "attrs"
-    groups:
-      aws:
-        patterns:
-          - "aws-*"
-          - "boto*"
-          - "botocore*"
-          - "s3transfer"
-      pytest:
-        patterns:
-          - "pytest"
-          - "pytest-*"
-      patches:
-        update-types:
-          - "patch"
-
-  # Python — dev/CDK dependencies (requirements.in → requirements.txt)
-  - package-ecosystem: "pip"
+  - package-ecosystem: "uv"
     directory: "/"
     schedule:
       interval: "weekly"
@@ -99,8 +44,6 @@ updates:
       semver-major-days: 14
       semver-minor-days: 7
       semver-patch-days: 3
-    ignore:
-      - dependency-name: "attrs"
     groups:
       aws-cdk:
         patterns:
@@ -113,6 +56,10 @@ updates:
           - "boto*"
           - "botocore*"
           - "s3transfer"
+      pytest:
+        patterns:
+          - "pytest"
+          - "pytest-*"
       docs:
         patterns:
           - "zensical"

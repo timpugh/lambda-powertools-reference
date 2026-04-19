@@ -16,19 +16,15 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
         with:
-          python-version: "3.13"
-          cache: pip
+          enable-cache: true
 
-      - name: Install pip-tools
-        run: pip install pip-tools
-
-      - name: Install dev dependencies
-        run: pip-sync requirements.txt
+      - name: Install CDK + lint + docs (and test for pytest plugins referenced by configs)
+        run: uv sync --group cdk --group test --group lint --group docs
 
       - name: Run pre-commit hooks
-        run: pre-commit run --all-files
+        run: uv run pre-commit run --all-files
 
   test:
     runs-on: ubuntu-latest
@@ -36,21 +32,17 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
         with:
-          python-version: "3.13"
-          cache: pip
+          enable-cache: true
 
-      - name: Install pip-tools
-        run: pip install pip-tools
-
-      - name: Install test and lambda dependencies
-        run: pip-sync tests/requirements.txt lambda/requirements.txt
+      - name: Install Lambda runtime + test runner
+        run: uv sync --only-group lambda --only-group test
 
       - name: Run unit tests
         env:
           AWS_DEFAULT_REGION: us-east-1
-        run: python -m pytest tests/unit -v
+        run: uv run pytest tests/unit -v
 
       - name: Upload coverage report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
@@ -65,23 +57,16 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
         with:
-          python-version: "3.13"
-          cache: pip
+          enable-cache: true
 
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f  # v6.3.0
         with:
           node-version: "22"
 
-      - name: Install pip-tools
-        run: pip install pip-tools
-
-      - name: Install CDK and dev dependencies
-        run: pip-sync requirements.txt
-
-      - name: Install pytest (separate from pip-sync to avoid attrs conflict)
-        run: pip install pytest pytest-mock pytest-timeout
+      - name: Install CDK + test runner
+        run: uv sync --group cdk --group test
 
       - name: Install CDK CLI
         run: npm install -g aws-cdk
@@ -96,4 +81,4 @@ jobs:
       - name: Run CDK stack assertion tests
         env:
           AWS_DEFAULT_REGION: us-east-1
-        run: python -m pytest tests/cdk -v --override-ini="addopts=" --timeout=120
+        run: uv run pytest tests/cdk -v --override-ini="addopts=" --timeout=120
