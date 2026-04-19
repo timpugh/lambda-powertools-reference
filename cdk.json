@@ -1,5 +1,5 @@
 {
-  "app": "python3 app.py",
+  "app": "uv run --group cdk --group test python3 app.py",
   "watch": {
     "include": ["**"],
     "exclude": [
