@@ -1,0 +1,25 @@
+{
+    "python.defaultInterpreterPath": "${workspaceFolder}/../.venv-lambda/bin/python",
+    "python.analysis.extraPaths": ["${workspaceFolder}/../lambda"],
+
+    "[python]": {
+        "editor.defaultFormatter": "charliermarsh.ruff",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+            "source.fixAll.ruff": "explicit",
+            "source.organizeImports.ruff": "explicit"
+        }
+    },
+
+    "ruff.configuration": "${workspaceFolder}/../pyproject.toml",
+
+    "mypy-type-checker.args": [
+        "--config-file=${workspaceFolder}/../pyproject.toml"
+    ],
+
+    "pylint.args": [
+        "--rcfile=${workspaceFolder}/../pyproject.toml"
+    ],
+
+    "editor.rulers": [120]
+}

@@ -191,6 +191,22 @@ To use the CDK, you need the following tools.
   * [Finch](https://runfinch.com/) — AWS-supported, open-source, license-friendly (recommended)
   * [Docker](https://www.docker.com/) — drop-in alternative; CDK uses Docker by default when `CDK_DOCKER` is unset
 
+## Editor setup (VS Code)
+
+The repo keeps two Python environments for the `attrs` conflict (`.venv` for CDK, `.venv-lambda` for Lambda runtime code — see "Project dependencies").
+
+**Recommended: open the workspace file.** Use `File > Open Workspace from File…` and pick `practice.code-workspace` at the repo root. This is the intended entry point and the only mode where VS Code gets both sides right.
+
+The workspace declares four folder roots — `.` (CDK + `.venv`), `lambda/` (`.venv-lambda`), `tests/unit/` (`.venv-lambda`), and `scripts/` (`.venv-lambda`). Per-folder `python.defaultInterpreterPath` overrides live in each folder's `.vscode/settings.json`. The effect:
+
+- **Pylance** spins up a separate instance per root, so CDK code resolves `aws_cdk` against `.venv` and Lambda code resolves `aws_lambda_powertools` against `.venv-lambda` at the same time. No red squiggles on one side or the other.
+- **Terminals** opened from each root (right-click the folder in the explorer → *Open in Integrated Terminal*, or `Ctrl+\`` while focused on a file under that root) auto-activate that root's venv.
+- **Test Explorer** discovers and runs unit tests under `.venv-lambda` and CDK tests under `.venv` independently.
+
+**Fallback: open the folder directly.** `File > Open Folder` on the repo root still works — `.vscode/settings.json` defaults the interpreter to `.venv`, so CDK work is fine, but Pylance will flag Powertools imports under `lambda/` as unresolved (single-interpreter-per-workspace limitation). Use this mode only if you specifically don't want the workspace file loaded.
+
+Note: [VS Code's `python-envs.pythonProjects` feature](https://code.visualstudio.com/docs/python/environments#_python-projects) would cover terminal activation and the test runner per folder inside a single workspace, but it assumes each project's venv lives under its folder. This repo keeps both venvs at the repo root (matching uv's layout and the `UV_PROJECT_ENVIRONMENT` switch the Makefile uses), so per-folder `python.defaultInterpreterPath` inside a multi-root workspace is the right fit. Pylance is single-interpreter per workspace anyway, so the multi-root workspace is the only way to get correct type resolution for both sides.
+
 ## Deploy the application
 
 This project needs a container runtime for bundling Lambda dependencies during synthesis. Either [Finch](https://runfinch.com/) or [Docker](https://www.docker.com/) works — CDK uses whichever runtime is pointed to by the `CDK_DOCKER` environment variable, and falls back to Docker when the variable is unset (see the [CDK GitHub issue](https://github.com/aws/aws-cdk/issues/23680#issuecomment-1741643237) where Finch support was added). Pick one:

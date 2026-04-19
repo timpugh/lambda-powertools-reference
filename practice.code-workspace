@@ -1,0 +1,32 @@
+{
+    "folders": [
+        {
+            "name": "Practice (CDK)",
+            "path": "."
+        },
+        {
+            "name": "Lambda runtime",
+            "path": "lambda"
+        },
+        {
+            "name": "Unit tests",
+            "path": "tests/unit"
+        },
+        {
+            "name": "Scripts",
+            "path": "scripts"
+        }
+    ],
+    "settings": {
+        "files.exclude": {
+            ".venv": true,
+            ".venv-lambda": true,
+            ".ruff_cache": true,
+            ".mypy_cache": true,
+            ".pytest_cache": true,
+            "cdk.out": true,
+            "**/__pycache__": true,
+            "**/*.egg-info": true
+        }
+    }
+}
