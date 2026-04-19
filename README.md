@@ -11,7 +11,8 @@ This project contains source code and supporting files for a serverless applicat
 
 - `app.py` - CDK entry point; instantiates the WAF, backend, and frontend stacks and calls `app.synth()`
 - `lambda/` - Code for the application's Lambda function
-- `hello_world/hello_world_stack.py` - The backend CDK stack (Lambda, API Gateway, DynamoDB, SSM, AppConfig)
+- `hello_world/hello_world_stack.py` - The backend CDK stack — a thin wrapper that composes `HelloWorldApp`, applies cdk-nag Aspects, and wires CfnOutputs
+- `hello_world/hello_world_app.py` - `HelloWorldApp` construct — owns the domain resources (Lambda, API Gateway, DynamoDB, SSM, AppConfig, monitoring)
 - `hello_world/hello_world_waf_stack.py` - The WAF stack (CloudFront-scoped WebACL, always in `us-east-1`)
 - `hello_world/hello_world_frontend_stack.py` - The frontend stack (S3 + CloudFront)
 - `hello_world/nag_utils.py` - Shared cdk-nag rule-pack helper (`apply_compliance_aspects`) and suppression list for CDK-managed singleton Lambdas
@@ -99,7 +100,7 @@ Resources are split across three stacks. All resources in all stacks have `Remov
 | CloudWatch Log Group (access) | API Gateway access logs (16-field JSON), KMS-encrypted |
 | CloudWatch Log Group (execution) | API Gateway execution logs, KMS-encrypted |
 | DynamoDB Table | Idempotency records (TTL, PAY_PER_REQUEST, PITR, KMS-encrypted) |
-| SSM Parameter | Greeting message (`/{stack}/greeting`) |
+| SSM Parameter | Greeting message (CDK-generated name, read via the `GREETING_PARAM_NAME` env var) |
 | AppConfig Application | Feature flag configuration |
 | AppConfig Environment | `{stack}-env` environment for feature flags |
 | AppConfig Configuration Profile | `{stack}-features` profile with `AWS.AppConfig.FeatureFlags` type |
@@ -121,6 +122,19 @@ Resources are split across three stacks. All resources in all stacks have `Remov
 | Glue Table (`s3_access_logs`) | 26-field regex-parsed schema for S3 server access logs |
 | Athena WorkGroup | Query execution config with SSE-S3 encrypted results, CloudWatch metrics enabled |
 | Athena Named Queries (5 CloudFront + 6 S3) | Pre-built SQL queries: top URIs, errors, top IPs, bandwidth by edge, cache hit ratio, top operations, error requests, top requesters, slow requests, access denied (403), object read audit |
+
+## Stack and construct composition
+
+The project follows the CDK best practice ["model with constructs, deploy with stacks"](https://docs.aws.amazon.com/cdk/v2/guide/best-practices.html): domain resources live inside reusable `Construct` subclasses, and each `Stack` is a thin wrapper that only composes constructs and applies stack-wide concerns (Aspects, CfnOutputs, stack-level nag suppressions).
+
+For the backend, that means:
+
+- [`HelloWorldApp`](hello_world/hello_world_app.py) — a `Construct` that owns the KMS key, DynamoDB table, SSM parameter, AppConfig application, Lambda function, API Gateway, Application Insights monitoring, dashboard, and Logs Insights saved queries, along with per-resource cdk-nag suppressions.
+- [`HelloWorldStack`](hello_world/hello_world_stack.py) — a `Stack` that instantiates `HelloWorldApp(self, "App")`, calls `apply_compliance_aspects(self)`, wires CfnOutputs, and attaches stack-level and singleton-scoped suppressions.
+
+The WAF and frontend stacks are small enough (single logical unit each) that they keep their resources inline — the construct-extraction pattern is demonstrated on the backend as the reference example.
+
+**Generated vs. physical resource names.** Following the ["use generated resource names"](https://docs.aws.amazon.com/cdk/v2/guide/best-practices.html) best practice, the backend does not set `table_name`, `parameter_name`, or `log_group_name` on the DynamoDB table, SSM parameter, Lambda log group, or API Gateway access log group — CDK auto-generates unique names derived from the construct path. This avoids two hazards: (1) replacement-style schema changes can't fail because the physical name is pinned, and (2) two regional deployments can't collide on the same physical name. Explicit names are retained only where AWS itself requires them: the API Gateway execution log group (`API-Gateway-Execution-Logs_{api-id}/{stage}` is a service-fixed format), the WAF log group (`aws-waf-logs-*` prefix is enforced), and the AppConfig L1 constructs (no auto-generation option via CDK).
 
 ## Quick start
 
@@ -311,7 +325,7 @@ This works for any AWS Lambda function, not just ones deployed with SAM. See the
 
 ## Add a resource to your application
 
-To add AWS resources, define new constructs in the appropriate stack file under `hello_world/`: backend resources (Lambda, API Gateway, DynamoDB, SSM, AppConfig) belong in `hello_world_stack.py`, frontend resources (S3, CloudFront) belong in `hello_world_frontend_stack.py`, and WAF rules belong in `hello_world_waf_stack.py`. The CDK provides high-level constructs for most AWS services. Browse available constructs in the [AWS CDK API Reference](https://docs.aws.amazon.com/cdk/api/v2/python/). For resources without a dedicated CDK construct, you can use [CloudFormation resource types](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-template-resource-type-ref.html) directly via `CfnResource`.
+To add AWS resources, define new constructs in the appropriate file under `hello_world/`: backend domain resources (Lambda, API Gateway, DynamoDB, SSM, AppConfig, anything the Lambda talks to at runtime) belong in `hello_world_app.py` inside the `HelloWorldApp` construct, frontend resources (S3, CloudFront) belong in `hello_world_frontend_stack.py`, and WAF rules belong in `hello_world_waf_stack.py`. `hello_world_stack.py` itself stays lean — only add something there if it is genuinely stack-wide (a new CfnOutput, a new Aspect, a stack-level nag suppression). The CDK provides high-level constructs for most AWS services. Browse available constructs in the [AWS CDK API Reference](https://docs.aws.amazon.com/cdk/api/v2/python/). For resources without a dedicated CDK construct, you can use [CloudFormation resource types](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-template-resource-type-ref.html) directly via `CfnResource`.
 
 ## Tests
 
@@ -343,6 +357,19 @@ mocker.patch.object(lambda_app.feature_flags, "evaluate", return_value=False)
 python -m pytest tests/unit -v
 # Shortcut: make test
 ```
+
+### CDK stack assertion tests
+
+`tests/cdk/test_stacks.py` synthesizes each CDK stack in-process using `aws_cdk.assertions.Template` and verifies that key security properties are correctly configured (KMS encryption on DynamoDB, PITR, CloudFront TLS policy, WAF attached, etc.). If a construct property is accidentally changed, the test fails at synth time rather than silently deploying an insecure template. Any unsuppressed cdk-nag finding also causes synthesis to fail, so these tests double as a CI gate for infrastructure misconfigurations.
+
+The suite also enforces the CDK best practice ["don't change logical IDs of stateful resources"](https://docs.aws.amazon.com/cdk/v2/guide/best-practices.html): `TestLogicalIdStability` freezes the logical IDs of all stateful resources (DynamoDB, KMS keys, S3 buckets, CloudFront distribution, SSM, AppConfig, WAF WebACL, and log groups) in a committed list. A refactor that moves or renames any of those constructs would change their logical ID — which for CloudFormation means resource replacement, i.e. data loss for stateful resources. The test catches that drift at PR time. If you genuinely need to change a logical ID, update the expected value in the same commit so the intent is reviewable.
+
+```bash
+python -m pytest tests/cdk -v --override-ini="addopts="
+# Shortcut: make test-cdk (requires aws_cdk — use `make install`, not `make install-dev`)
+```
+
+Asset bundling (Docker) is skipped via the `aws:cdk:bundling-stacks` context key so these tests run without Docker.
 
 ### Integration tests
 
@@ -1021,7 +1048,7 @@ The stack includes a [cdk-monitoring-constructs](https://github.com/cdklabs/cdk-
 
 Project documentation is generated by [Zensical](https://zensical.org/) (the MkDocs-Material successor from the same maintainer) with the [mkdocstrings](https://mkdocstrings.github.io/) Python handler, and covers two distinct audiences in one site:
 
-- **Code reference (for developers)** — autodoc-rendered pages for `lambda/app.py` (Lambda handler), `hello_world/hello_world_stack.py` (backend), `hello_world/hello_world_waf_stack.py` (WAF), `hello_world/hello_world_frontend_stack.py` (frontend), and `hello_world/nag_utils.py` (shared suppression utilities). Generated from Google-style docstrings via the `::: module.path` directive in each page.
+- **Code reference (for developers)** — autodoc-rendered pages for `lambda/app.py` (Lambda handler), `hello_world/hello_world_stack.py` (backend stack wrapper), `hello_world/hello_world_app.py` (backend domain construct), `hello_world/hello_world_waf_stack.py` (WAF), `hello_world/hello_world_frontend_stack.py` (frontend), and `hello_world/nag_utils.py` (shared suppression utilities). Generated from Google-style docstrings via the `::: module.path` directive in each page.
 - **HTTP API reference (for callers)** — a standalone [Scalar](https://github.com/scalar/scalar) API Reference page at `/api.html`, rendered in the browser from `/openapi.json`. Both files are generated pre-build by `scripts/generate_openapi.py` (which imports the Lambda resolver and serializes its schema) and copied into the built site verbatim by Zensical (non-markdown assets in `docs/` pass through untouched). The `make docs` target regenerates the spec before invoking Zensical, so the API page always matches the live code. Scalar's OSS bundle includes a built-in request sandbox — unlike Redoc, which gates "Try it out" behind Redocly's paid tier.
 
   The Scalar bundle is loaded from jsdelivr with a **pinned version + SRI hash** rather than a fresh-from-the-internet `@latest` tag. The browser verifies the integrity hash on every page load, so if the CDN is ever compromised to serve tampered bytes, execution fails closed. Upgrading is a two-line change: bump the version in `docs/api.html` and drop in a new hash (the file has a one-line `openssl` recipe in its comments).
@@ -1139,7 +1166,7 @@ pip install -r tests/requirements.txt -r lambda/requirements.txt
 
 **attrs version conflict** — `requirements.txt` (dev) pins `attrs==25.4.0` for CDK compatibility, while `lambda/requirements.txt` pins `attrs==26.1.0` for Powertools. These two versions cannot coexist in a single environment. This is why the CI is split into separate `quality` and `test` jobs, and why local test deps are installed with `pip install -r` (additive) rather than `pip-sync` (destructive).
 
-**SSM parameter path is derived from the stack name** — the greeting parameter is stored at `/{stack_name}/greeting` in SSM (e.g. `/HelloWorld-us-east-1/greeting`), so each regional deployment gets its own parameter automatically. This is intentional for a reference project but would likely be parameterised differently in a production stack.
+**SSM parameter name is CDK-generated** — the greeting parameter's name is auto-generated by CDK (derived from the construct path, e.g. `HelloWorld-us-east-1AppGreetingParameterD5E6E64F`) rather than set explicitly. The Lambda reads the name from the `GREETING_PARAM_NAME` env var, which CDK wires up from `greeting_param.parameter_name`, so the name never needs to be human-memorable. This follows the CDK "use generated resource names" best practice — see [Stack and construct composition](#stack-and-construct-composition).
 
 **CORS is open (`allow_origin="*"`)** — the Lambda handler configures `APIGatewayRestResolver` with `CORSConfig(allow_origin="*")` for simplicity. In production, restrict this to the specific CloudFront domain (e.g., `allow_origin="https://d1234.cloudfront.net"`) and set `allow_credentials=True` if the API requires cookies or Authorization headers. Leaving CORS open in production allows any origin to call the API from a browser.
 
