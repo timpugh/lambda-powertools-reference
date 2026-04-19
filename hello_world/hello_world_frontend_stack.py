@@ -1,7 +1,6 @@
 from typing import Any, cast
 
 from aws_cdk import (
-    Aspects,
     CfnOutput,
     CustomResourceProvider,
     Fn,
@@ -35,10 +34,10 @@ from aws_cdk import (
 from aws_cdk import (
     aws_s3_deployment as s3deploy,
 )
-from cdk_nag import AwsSolutionsChecks, NagSuppressions, NIST80053R5Checks, ServerlessChecks
+from cdk_nag import NagSuppressions
 from constructs import Construct
 
-from hello_world.nag_utils import CDK_LAMBDA_SUPPRESSIONS
+from hello_world.nag_utils import CDK_LAMBDA_SUPPRESSIONS, apply_compliance_aspects
 
 
 class HelloWorldFrontendStack(Stack):
@@ -66,9 +65,7 @@ class HelloWorldFrontendStack(Stack):
         """
         super().__init__(scope, construct_id, **kwargs)
 
-        Aspects.of(self).add(AwsSolutionsChecks(verbose=True))
-        Aspects.of(self).add(ServerlessChecks(verbose=True))
-        Aspects.of(self).add(NIST80053R5Checks(verbose=True))
+        apply_compliance_aspects(self)
 
         # ── KMS key ──────────────────────────────────────────────────────────
         # Used to encrypt the frontend S3 bucket and CloudWatch log group.
@@ -124,11 +121,35 @@ class HelloWorldFrontendStack(Stack):
                     "reason": "S3 log delivery service does not support KMS-encrypted target buckets; SSE-S3 is used instead",
                 },
                 {
+                    "id": "HIPAA.Security-S3DefaultEncryptionKMS",
+                    "reason": "S3 log delivery service does not support KMS-encrypted target buckets; SSE-S3 is used instead",
+                },
+                {
+                    "id": "PCI.DSS.321-S3DefaultEncryptionKMS",
+                    "reason": "S3 log delivery service does not support KMS-encrypted target buckets; SSE-S3 is used instead",
+                },
+                {
                     "id": "NIST.800.53.R5-S3BucketVersioningEnabled",
                     "reason": "Versioning not needed for log bucket — logs are append-only and transient",
                 },
                 {
+                    "id": "HIPAA.Security-S3BucketVersioningEnabled",
+                    "reason": "Versioning not needed for log bucket — logs are append-only and transient",
+                },
+                {
+                    "id": "PCI.DSS.321-S3BucketVersioningEnabled",
+                    "reason": "Versioning not needed for log bucket — logs are append-only and transient",
+                },
+                {
                     "id": "NIST.800.53.R5-S3BucketReplicationEnabled",
+                    "reason": "Replication not needed for log bucket in sample app",
+                },
+                {
+                    "id": "HIPAA.Security-S3BucketReplicationEnabled",
+                    "reason": "Replication not needed for log bucket in sample app",
+                },
+                {
+                    "id": "PCI.DSS.321-S3BucketReplicationEnabled",
                     "reason": "Replication not needed for log bucket in sample app",
                 },
             ],
@@ -297,6 +318,24 @@ class HelloWorldFrontendStack(Stack):
                 },
                 {
                     "id": "NIST.800.53.R5-S3BucketVersioningEnabled",
+                    "reason": "S3 versioning not needed for sample app — static assets are redeployable via cdk deploy",
+                },
+                # ── HIPAA Security ───────────────────────────────────────────────
+                {
+                    "id": "HIPAA.Security-S3BucketReplicationEnabled",
+                    "reason": "S3 replication not needed for sample app — static assets are redeployable",
+                },
+                {
+                    "id": "HIPAA.Security-S3BucketVersioningEnabled",
+                    "reason": "S3 versioning not needed for sample app — static assets are redeployable via cdk deploy",
+                },
+                # ── PCI DSS 3.2.1 ────────────────────────────────────────────────
+                {
+                    "id": "PCI.DSS.321-S3BucketReplicationEnabled",
+                    "reason": "S3 replication not needed for sample app — static assets are redeployable",
+                },
+                {
+                    "id": "PCI.DSS.321-S3BucketVersioningEnabled",
                     "reason": "S3 versioning not needed for sample app — static assets are redeployable via cdk deploy",
                 },
             ],

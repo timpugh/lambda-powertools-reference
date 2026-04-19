@@ -1,7 +1,6 @@
 from typing import Any, cast
 
 from aws_cdk import (
-    Aspects,
     CfnOutput,
     Duration,
     RemovalPolicy,
@@ -42,10 +41,10 @@ from aws_cdk import (
 )
 from aws_cdk.aws_lambda_python_alpha import PythonFunction
 from cdk_monitoring_constructs import DefaultDashboardFactory, MonitoringFacade
-from cdk_nag import AwsSolutionsChecks, NagSuppressions, NIST80053R5Checks, ServerlessChecks
+from cdk_nag import NagSuppressions
 from constructs import Construct
 
-from hello_world.nag_utils import CDK_LAMBDA_SUPPRESSIONS
+from hello_world.nag_utils import CDK_LAMBDA_SUPPRESSIONS, apply_compliance_aspects
 
 
 class HelloWorldStack(Stack):
@@ -73,10 +72,7 @@ class HelloWorldStack(Stack):
         """
         super().__init__(scope, construct_id, **kwargs)
 
-        # cdk-nag: apply AWS Solutions checks
-        Aspects.of(self).add(AwsSolutionsChecks(verbose=True))
-        Aspects.of(self).add(ServerlessChecks(verbose=True))
-        Aspects.of(self).add(NIST80053R5Checks(verbose=True))
+        apply_compliance_aspects(self)
 
         # KMS key shared across all CloudWatch log groups and DynamoDB in this stack.
         # CloudWatch Logs requires the Logs service principal to be granted access
@@ -437,10 +433,20 @@ class HelloWorldStack(Stack):
                     "reason": "Invoked synchronously via API Gateway — async DLQ pattern does not apply",
                 },
                 {
+                    "id": "HIPAA.Security-LambdaDLQ",
+                    "reason": "Invoked synchronously via API Gateway — async DLQ pattern does not apply",
+                },
+                {
                     "id": "NIST.800.53.R5-LambdaConcurrency",
                     "reason": "Concurrency limits not configured for sample app",
                 },
+                {
+                    "id": "HIPAA.Security-LambdaConcurrency",
+                    "reason": "Concurrency limits not configured for sample app",
+                },
                 {"id": "NIST.800.53.R5-LambdaInsideVPC", "reason": "No VPC — adds significant operational complexity"},
+                {"id": "HIPAA.Security-LambdaInsideVPC", "reason": "No VPC — adds significant operational complexity"},
+                {"id": "PCI.DSS.321-LambdaInsideVPC", "reason": "No VPC — adds significant operational complexity"},
                 # Service role uses AWSLambdaBasicExecutionRole managed policy
                 {
                     "id": "AwsSolutions-IAM4",
@@ -463,6 +469,14 @@ class HelloWorldStack(Stack):
                 },
                 {
                     "id": "NIST.800.53.R5-IAMNoInlinePolicy",
+                    "reason": "CDK generates the default policy inline on the Lambda service role — not directly configurable",
+                },
+                {
+                    "id": "HIPAA.Security-IAMNoInlinePolicy",
+                    "reason": "CDK generates the default policy inline on the Lambda service role — not directly configurable",
+                },
+                {
+                    "id": "PCI.DSS.321-IAMNoInlinePolicy",
                     "reason": "CDK generates the default policy inline on the Lambda service role — not directly configurable",
                 },
             ],
@@ -492,6 +506,14 @@ class HelloWorldStack(Stack):
                 },
                 {
                     "id": "NIST.800.53.R5-IAMNoInlinePolicy",
+                    "reason": "AwsCustomResource generates an inline policy — not directly configurable",
+                },
+                {
+                    "id": "HIPAA.Security-IAMNoInlinePolicy",
+                    "reason": "AwsCustomResource generates an inline policy — not directly configurable",
+                },
+                {
+                    "id": "PCI.DSS.321-IAMNoInlinePolicy",
                     "reason": "AwsCustomResource generates an inline policy — not directly configurable",
                 },
             ],
@@ -542,6 +564,24 @@ class HelloWorldStack(Stack):
                 {
                     "id": "NIST.800.53.R5-DynamoDBInBackupPlan",
                     "reason": "AWS Backup plan not configured for sample app — PITR is enabled for point-in-time recovery",
+                },
+                # ── HIPAA Security ───────────────────────────────────────────────
+                {
+                    "id": "HIPAA.Security-APIGWSSLEnabled",
+                    "reason": "Client-side SSL certificates not required for sample app",
+                },
+                {
+                    "id": "HIPAA.Security-DynamoDBInBackupPlan",
+                    "reason": "AWS Backup plan not configured for sample app — PITR is enabled for point-in-time recovery",
+                },
+                # ── PCI DSS 3.2.1 ────────────────────────────────────────────────
+                {
+                    "id": "PCI.DSS.321-APIGWAssociatedWithWAF",
+                    "reason": "WAF not attached to API Gateway — applied at CloudFront instead",
+                },
+                {
+                    "id": "PCI.DSS.321-APIGWSSLEnabled",
+                    "reason": "Client-side SSL certificates not required for sample app",
                 },
             ],
         )

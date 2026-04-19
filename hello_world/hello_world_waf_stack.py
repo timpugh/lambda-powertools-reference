@@ -1,7 +1,6 @@
 from typing import Any
 
 from aws_cdk import (
-    Aspects,
     CfnOutput,
     RemovalPolicy,
     Stack,
@@ -18,8 +17,10 @@ from aws_cdk import (
 from aws_cdk import (
     aws_wafv2 as wafv2,
 )
-from cdk_nag import AwsSolutionsChecks, NagSuppressions, NIST80053R5Checks, ServerlessChecks
+from cdk_nag import NagSuppressions
 from constructs import Construct
+
+from hello_world.nag_utils import apply_compliance_aspects
 
 
 class HelloWorldWafStack(Stack):
@@ -45,9 +46,7 @@ class HelloWorldWafStack(Stack):
         """
         super().__init__(scope, construct_id, **kwargs)
 
-        Aspects.of(self).add(AwsSolutionsChecks(verbose=True))
-        Aspects.of(self).add(ServerlessChecks(verbose=True))
-        Aspects.of(self).add(NIST80053R5Checks(verbose=True))
+        apply_compliance_aspects(self)
 
         # KMS key for WAF log group encryption.
         # CloudWatch Logs requires the key policy to grant the Logs service
