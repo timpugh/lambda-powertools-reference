@@ -35,10 +35,13 @@ jobs:
           fi
 
       - name: Install CDK + lint + docs (and test for pytest plugins referenced by configs)
-        run: uv sync --group cdk --group test --group lint --group docs
+        run: uv sync --locked --group cdk --group test --group lint --group docs
 
       - name: Run pre-commit hooks
         run: uv run pre-commit run --all-files
+
+      - name: Prune uv cache
+        run: uv cache prune --ci
 
   test:
     runs-on: ubuntu-latest
@@ -51,7 +54,7 @@ jobs:
           enable-cache: true
 
       - name: Install Lambda runtime + test runner
-        run: uv sync --only-group lambda --only-group test
+        run: uv sync --locked --only-group lambda --only-group test
 
       - name: Run unit tests
         env:
@@ -64,6 +67,9 @@ jobs:
         with:
           name: coverage-report
           path: report.html
+
+      - name: Prune uv cache
+        run: uv cache prune --ci
 
   cdk-check:
     runs-on: ubuntu-latest
@@ -80,7 +86,7 @@ jobs:
           node-version: "22"
 
       - name: Install CDK + test runner
-        run: uv sync --group cdk --group test
+        run: uv sync --locked --group cdk --group test
 
       - name: Install CDK CLI
         run: npm install -g aws-cdk
@@ -96,3 +102,6 @@ jobs:
         env:
           AWS_DEFAULT_REGION: us-east-1
         run: uv run pytest tests/cdk -v --override-ini="addopts=" --timeout=120
+
+      - name: Prune uv cache
+        run: uv cache prune --ci

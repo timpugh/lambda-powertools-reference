@@ -25,7 +25,7 @@ jobs:
       # inside pip-audit's dry-run install. Passing all three files to a single
       # invocation would fail with ResolutionImpossible on attrs.
       - name: Install pip-audit
-        run: uv sync --only-group lint
+        run: uv sync --locked --only-group lint
 
       - name: Export each group to a requirements file
         run: |
@@ -43,3 +43,6 @@ jobs:
             echo "::endgroup::"
           done
           exit $failed
+
+      - name: Prune uv cache
+        run: uv cache prune --ci
