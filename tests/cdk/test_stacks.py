@@ -222,3 +222,73 @@ class TestFrontendStack:
         frontend_template.has_output("CloudFrontDomainName", {})
         frontend_template.has_output("CloudFrontDistributionId", {})
         frontend_template.has_output("FrontendBucketName", {})
+
+
+# ── Logical ID stability for stateful resources ───────────────────────────────
+# CDK best practice: never let the logical ID of a stateful resource drift.
+# A changed logical ID makes CloudFormation replace the resource — which for
+# a DynamoDB table, S3 bucket, KMS key, or CloudFront distribution means data
+# loss, downtime, or both. These tests lock in the current logical IDs so any
+# refactor that would silently rename one (e.g., moving a construct, renaming
+# a variable) fails at test time instead of at deploy time.
+#
+# If you genuinely need to change one of these IDs, use ``CfnResource.overrideLogicalId``
+# to preserve the old name, or accept replacement and update this test in the
+# same commit so the intent is reviewable.
+
+
+class TestLogicalIdStability:
+    """Lock in logical IDs of stateful resources — changing one replaces the resource."""
+
+    # ── Backend ────────────────────────────────────────────────────────────────
+
+    def test_backend_dynamodb_table_id(self, backend_template: Template) -> None:
+        assert "AppIdempotencyTable7A3F72D5" in backend_template.find_resources("AWS::DynamoDB::Table")
+
+    def test_backend_kms_key_id(self, backend_template: Template) -> None:
+        assert "AppEncryptionKey7F644894" in backend_template.find_resources("AWS::KMS::Key")
+
+    def test_backend_ssm_parameter_id(self, backend_template: Template) -> None:
+        assert "AppGreetingParameterD5E6E64F" in backend_template.find_resources("AWS::SSM::Parameter")
+
+    def test_backend_appconfig_application_id(self, backend_template: Template) -> None:
+        assert "AppFeatureFlagsAppD0EAAC11" in backend_template.find_resources("AWS::AppConfig::Application")
+
+    def test_backend_appconfig_environment_id(self, backend_template: Template) -> None:
+        assert "AppFeatureFlagsEnvBF21F0D3" in backend_template.find_resources("AWS::AppConfig::Environment")
+
+    def test_backend_appconfig_profile_id(self, backend_template: Template) -> None:
+        assert "AppFeatureFlagsProfile324F0464" in backend_template.find_resources(
+            "AWS::AppConfig::ConfigurationProfile"
+        )
+
+    def test_backend_log_group_ids(self, backend_template: Template) -> None:
+        log_groups = backend_template.find_resources("AWS::Logs::LogGroup")
+        assert "AppHelloWorldFunctionLogGroupD773BE34" in log_groups
+        assert "AppHelloWorldApiAccessLogsBAD11F8B" in log_groups
+        assert "AppHelloWorldApiExecutionLogsA5806940" in log_groups
+
+    # ── Frontend ───────────────────────────────────────────────────────────────
+
+    def test_frontend_kms_key_id(self, frontend_template: Template) -> None:
+        assert "FrontendEncryptionKey272BB0CA" in frontend_template.find_resources("AWS::KMS::Key")
+
+    def test_frontend_bucket_ids(self, frontend_template: Template) -> None:
+        buckets = frontend_template.find_resources("AWS::S3::Bucket")
+        assert "FrontendBucketEFE2E19C" in buckets
+        assert "FrontendAccessLogBucketD05E8E55" in buckets
+
+    def test_frontend_cloudfront_distribution_id(self, frontend_template: Template) -> None:
+        assert "Distribution830FAC52" in frontend_template.find_resources("AWS::CloudFront::Distribution")
+
+    # ── WAF ────────────────────────────────────────────────────────────────────
+
+    def test_waf_kms_key_id(self, waf_template: Template) -> None:
+        assert "WafEncryptionKeyB025E51A" in waf_template.find_resources("AWS::KMS::Key")
+
+    def test_waf_log_group_id(self, waf_template: Template) -> None:
+        assert "WafLogGroupDFDE65B0" in waf_template.find_resources("AWS::Logs::LogGroup")
+
+    def test_waf_webacl_id(self, waf_template: Template) -> None:
+        # L1 CfnWebACL — its logical ID is the construct_id with no hash suffix.
+        assert "WebACL" in waf_template.find_resources("AWS::WAFv2::WebACL")
