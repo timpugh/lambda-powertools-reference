@@ -112,11 +112,11 @@ COOLDOWN_CUTOFF := $(shell python3 -c 'from datetime import datetime, timedelta,
 
 lock: ## Regenerate uv.lock and lambda/requirements.txt from pyproject.toml
 	uv lock
-	uv export --only-group lambda --no-emit-project --format requirements.txt -o lambda/requirements.txt
+	uv export --only-group lambda --no-emit-project --no-header --format requirements.txt -o lambda/requirements.txt
 
 upgrade: ## Upgrade all dependencies to latest versions older than COOLDOWN_DAYS days
 	uv lock --upgrade --exclude-newer $(COOLDOWN_CUTOFF)
-	uv export --only-group lambda --no-emit-project --format requirements.txt -o lambda/requirements.txt
+	uv export --only-group lambda --no-emit-project --no-header --format requirements.txt -o lambda/requirements.txt
 
 # =============================================================================
 # Cleanup

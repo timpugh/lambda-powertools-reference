@@ -20,6 +20,20 @@ jobs:
         with:
           enable-cache: true
 
+      # Fails when the committed lambda/requirements.txt drifts from uv.lock.
+      # Dependabot's uv ecosystem regenerates pyproject.toml + uv.lock but does
+      # not know about the exported requirements file that PythonFunction bundles
+      # into the deployed Lambda — so without this check, a merged Dependabot PR
+      # could ship a Lambda built from stale pins. Fix by running `make lock`.
+      - name: Check lambda/requirements.txt is in sync with uv.lock
+        run: |
+          uv export --only-group lambda --no-emit-project --no-header --format requirements.txt -o /tmp/expected-requirements.txt
+          if ! diff -q /tmp/expected-requirements.txt lambda/requirements.txt > /dev/null; then
+            echo "::error::lambda/requirements.txt is out of sync with uv.lock. Run 'make lock' locally and commit the result."
+            diff /tmp/expected-requirements.txt lambda/requirements.txt || true
+            exit 1
+          fi
+
       - name: Install CDK + lint + docs (and test for pytest plugins referenced by configs)
         run: uv sync --group cdk --group test --group lint --group docs
 
