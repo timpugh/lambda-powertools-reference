@@ -138,7 +138,7 @@ For the backend, that means:
 
 The WAF and frontend stacks are small enough (single logical unit each) that they keep their resources inline — the construct-extraction pattern is demonstrated on the backend as the reference example.
 
-The three stacks are then composed into a [`cdk.Stage`](hello_world/hello_world_stage.py) — `HelloWorldStage`. A Stage is the CDK best-practice deployment unit: it groups stacks that are always deployed together, scopes synthesis under its own subdirectory (`cdk.out/assembly-{stage}/`), and is the natural boundary for CDK Pipelines. Stack names are set explicitly via `stack_name=` inside the Stage so the CloudFormation names stay as `HelloWorld-{region}` etc. — without the override, the Stage ID would be prepended.
+The three stacks are then composed into a [`cdk.Stage`](hello_world/hello_world_stage.py) — `HelloWorldStage`. A Stage is the CDK best-practice deployment unit ([AWS guide](https://docs.aws.amazon.com/cdk/v2/guide/best-practices.html), [AWS Heroes article](https://dev.to/aws-heroes/aws-cdk-deployment-best-practices-3doo)): it groups stacks that are always deployed together, scopes synthesis under its own subdirectory (`cdk.out/assembly-{stage}/`), and is the natural boundary for CDK Pipelines. Stack names are set explicitly via `stack_name=` inside the Stage so the CloudFormation names stay as `HelloWorld-{region}` etc. — without the override, the Stage ID would be prepended.
 
 **Generated vs. physical resource names.** Following the ["use generated resource names"](https://docs.aws.amazon.com/cdk/v2/guide/best-practices.html) best practice, the backend does not set `table_name`, `parameter_name`, or `log_group_name` on the DynamoDB table, SSM parameter, Lambda log group, or API Gateway access log group — CDK auto-generates unique names derived from the construct path. This avoids two hazards: (1) replacement-style schema changes can't fail because the physical name is pinned, and (2) two regional deployments can't collide on the same physical name. Explicit names are retained only where AWS itself requires them: the API Gateway execution log group (`API-Gateway-Execution-Logs_{api-id}/{stage}` is a service-fixed format), the WAF log group (`aws-waf-logs-*` prefix is enforced), and the AppConfig L1 constructs (no auto-generation option via CDK).
 
@@ -569,7 +569,7 @@ Key flags in `addopts`:
 
 ## Security
 
-Security is enforced at three layers, each covering a different surface area:
+Security follows the AWS [CDK security best practices guide](https://docs.aws.amazon.com/cdk/v2/guide/best-practices-security.html) — least-privilege IAM, encryption at rest and in transit, cdk-nag rule packs in the synth loop, and no hardcoded secrets. It is enforced at three layers, each covering a different surface area:
 
 | Layer | Tool | What it scans | When it runs |
 |---|---|---|---|
@@ -885,7 +885,7 @@ CDK uses context flags to opt into newer behaviors that would otherwise be break
 
 ### Commit `cdk.context.json`
 
-The `cdk.context.json` file — distinct from the `cdk.json` context block above — caches environmental lookups (AZs, AMI IDs, hosted zones, SSM parameter values) that CDK resolves at synth time. **It is committed to the repo on purpose.** Per the CDK [best practice](https://docs.aws.amazon.com/cdk/v2/guide/context.html), the same cached values must be used across every synth of a given commit, or templates will drift depending on whose machine ran the build.
+The `cdk.context.json` file — distinct from the `cdk.json` context block above — caches environmental lookups (AZs, AMI IDs, hosted zones, SSM parameter values) that CDK resolves at synth time. **It is committed to the repo on purpose.** Per the CDK best practice ([AWS context guide](https://docs.aws.amazon.com/cdk/v2/guide/context.html), [AWS guide](https://docs.aws.amazon.com/cdk/v2/guide/best-practices.html), [AWS Heroes article](https://dev.to/aws-heroes/aws-cdk-deployment-best-practices-3doo)), the same cached values must be used across every synth of a given commit, or templates will drift depending on whose machine ran the build.
 
 If `cdk.context.json` were gitignored, the first synth after a fresh clone would re-resolve every lookup against live AWS APIs and rewrite the file — which means two engineers synthesizing the same commit might produce different CloudFormation templates, and CI might produce yet a third. Committing the file pins the values so the synth is deterministic per commit. To refresh a cached value intentionally, run `cdk context --reset <key>` and commit the resulting diff.
 
@@ -1212,4 +1212,7 @@ Every resource in the stack — including all three CloudWatch log groups — is
 
 ## Resources
 
-See the [AWS CDK Developer Guide](https://docs.aws.amazon.com/cdk/v2/guide/home.html) for an introduction to CDK concepts and the CDK CLI.
+- [AWS CDK Developer Guide](https://docs.aws.amazon.com/cdk/v2/guide/home.html) — introduction to CDK concepts and the CDK CLI.
+- [AWS CDK best practices](https://docs.aws.amazon.com/cdk/v2/guide/best-practices.html) — the official best-practices guide this project follows.
+- [AWS CDK security best practices](https://docs.aws.amazon.com/cdk/v2/guide/best-practices-security.html) — companion security-focused guide.
+- [AWS CDK deployment best practices](https://dev.to/aws-heroes/aws-cdk-deployment-best-practices-3doo) — AWS Heroes article covering Stage usage, `cdk.context.json`, generated resource names, logical-ID stability, and the "model with constructs, deploy with stacks" pattern.
