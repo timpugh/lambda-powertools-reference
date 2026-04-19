@@ -13,14 +13,19 @@ Import it and pass it to ``NagSuppressions.add_resource_suppressions_by_path``
 or ``NagSuppressions.add_resource_suppressions`` with ``apply_to_children=True``.
 """
 
+from collections.abc import Iterable
+from typing import cast
+
 from aws_cdk import Aspects, Stack
 from cdk_nag import (
     AwsSolutionsChecks,
     HIPAASecurityChecks,
+    NagSuppressions,
     NIST80053R5Checks,
     PCIDSS321Checks,
     ServerlessChecks,
 )
+from constructs import Construct, IConstruct
 
 
 def apply_compliance_aspects(stack: Stack) -> None:
@@ -30,6 +35,24 @@ def apply_compliance_aspects(stack: Stack) -> None:
     Aspects.of(stack).add(NIST80053R5Checks(verbose=True))
     Aspects.of(stack).add(HIPAASecurityChecks(verbose=True))
     Aspects.of(stack).add(PCIDSS321Checks(verbose=True))
+
+
+def suppress_cdk_singletons(scope: IConstruct, singleton_ids: Iterable[str]) -> None:
+    """Apply ``CDK_LAMBDA_SUPPRESSIONS`` to any CDK-managed singletons present under ``scope``.
+
+    Resolves each ID via ``node.try_find_child`` rather than an absolute path
+    string so suppressions survive being nested in a ``cdk.Stage``. Missing IDs
+    are tolerated — some singletons only appear when the construct that needs
+    them is instantiated.
+    """
+    for singleton_id in singleton_ids:
+        singleton = scope.node.try_find_child(singleton_id)
+        if singleton is not None:
+            NagSuppressions.add_resource_suppressions(
+                cast(Construct, singleton),
+                CDK_LAMBDA_SUPPRESSIONS,
+                apply_to_children=True,
+            )
 
 
 CDK_LAMBDA_SUPPRESSIONS = [

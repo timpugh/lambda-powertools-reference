@@ -37,7 +37,7 @@ from aws_cdk import (
 from cdk_nag import NagSuppressions
 from constructs import Construct
 
-from hello_world.nag_utils import CDK_LAMBDA_SUPPRESSIONS, apply_compliance_aspects
+from hello_world.nag_utils import CDK_LAMBDA_SUPPRESSIONS, apply_compliance_aspects, suppress_cdk_singletons
 
 
 class HelloWorldFrontendStack(Stack):
@@ -264,36 +264,30 @@ class HelloWorldFrontendStack(Stack):
         self._create_athena_glue_resources(access_log_bucket)
 
         # ── Per-resource cdk-nag suppressions ──────────────────────────────────
-        # All Lambdas in this stack are CDK-managed singletons. They are stack-level
-        # siblings, not children of user-facing constructs, so path-based suppression
-        # is required. The access log bucket is suppressed separately because its
-        # reason differs from the frontend bucket.
+        # All Lambdas in this stack are CDK-managed singletons. Their construct
+        # IDs are stable (hashed from CDK's own source) but they are created as
+        # stack-level siblings of the construct that requested them, so we look
+        # them up with ``try_find_child`` rather than absolute path strings —
+        # this keeps the suppression working regardless of whether the stack is
+        # at the App root or nested inside a cdk.Stage.
         #
         # Stable singleton IDs:
         #   Custom::CDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C — BucketDeployment provider
         #   Custom::S3AutoDeleteObjectsCustomResourceProvider — auto-delete provider
         #   LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a — log retention singleton
+        suppress_cdk_singletons(
+            self,
+            (
+                "Custom::CDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C",
+                "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a",
+            ),
+        )
 
-        NagSuppressions.add_resource_suppressions_by_path(
-            self,
-            f"/{self.stack_name}/Custom::CDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C",
-            CDK_LAMBDA_SUPPRESSIONS,
-            apply_to_children=True,
-        )
         # minimizePolicies restructures the BucketDeployment handler's inline
-        # policy into a separate resource under DeployFrontend/CustomResourceHandler
-        NagSuppressions.add_resource_suppressions_by_path(
-            self,
-            f"/{self.stack_name}/DeployFrontend/CustomResourceHandler",
-            CDK_LAMBDA_SUPPRESSIONS,
-            apply_to_children=True,
-        )
-        NagSuppressions.add_resource_suppressions_by_path(
-            self,
-            f"/{self.stack_name}/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a",
-            CDK_LAMBDA_SUPPRESSIONS,
-            apply_to_children=True,
-        )
+        # policy into a separate resource under DeployFrontend/CustomResourceHandler.
+        deploy_frontend = self.node.try_find_child("DeployFrontend")
+        if deploy_frontend is not None:
+            suppress_cdk_singletons(deploy_frontend, ("CustomResourceHandler",))
         if auto_delete_provider is not None:
             NagSuppressions.add_resource_suppressions(
                 auto_delete_provider,

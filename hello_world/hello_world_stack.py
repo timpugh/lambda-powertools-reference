@@ -6,7 +6,15 @@ from cdk_nag import NagSuppressions
 from constructs import Construct
 
 from hello_world.hello_world_app import HelloWorldApp
-from hello_world.nag_utils import CDK_LAMBDA_SUPPRESSIONS, apply_compliance_aspects
+from hello_world.nag_utils import apply_compliance_aspects, suppress_cdk_singletons
+
+# CDK-managed singleton Lambda construct IDs. These are derived from CDK's
+# own source hashes and have remained stable for years — not from our code,
+# so they do not move when the stack is rescoped under a cdk.Stage.
+_CDK_SINGLETON_IDS = (
+    "AWS679f53fac002430cb0da5b7982bd2287",  # AwsCustomResource provider Lambda
+    "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a",  # log retention singleton
+)
 
 
 class HelloWorldStack(Stack):
@@ -75,22 +83,11 @@ class HelloWorldStack(Stack):
         # ── Singleton-scoped cdk-nag suppressions ───────────────────────────────
         # CDK-managed singleton Lambdas (AwsCustomResource provider, LogRetention)
         # are created at the stack level as siblings of the construct that
-        # requested them, not as children. Path-based suppression is the only
-        # way to target them precisely.
-        #
-        # Stable singleton IDs (derived from CDK source hashes — do not change):
-        #   AWS679f53fac002430cb0da5b7982bd2287  — AwsCustomResource provider Lambda
-        #   LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a — log retention singleton
-        for _singleton_id in (
-            "AWS679f53fac002430cb0da5b7982bd2287",
-            "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a",
-        ):
-            NagSuppressions.add_resource_suppressions_by_path(
-                self,
-                f"/{self.stack_name}/{_singleton_id}",
-                CDK_LAMBDA_SUPPRESSIONS,
-                apply_to_children=True,
-            )
+        # requested them, not as children. ``suppress_cdk_singletons`` looks
+        # them up via ``try_find_child`` so the suppressions keep working
+        # regardless of whether the stack is at the App root or nested inside
+        # a cdk.Stage.
+        suppress_cdk_singletons(self, _CDK_SINGLETON_IDS)
 
         # ── Stack-level cdk-nag suppressions (genuinely stack-wide) ─────────────
         NagSuppressions.add_stack_suppressions(

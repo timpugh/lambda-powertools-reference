@@ -224,6 +224,9 @@ $RECYCLE.BIN/
 
 # CDK specific
 cdk.out/
+# cdk.context.json is intentionally NOT ignored — it must be committed.
+# CDK writes cached AZ/AMI/SSM lookups there; missing it means the next
+# synth may pick different values and produce a surprise diff in CI.
 
 # End of https://www.gitignore.io/api/osx,linux,python,windows,pycharm,visualstudiocode
 

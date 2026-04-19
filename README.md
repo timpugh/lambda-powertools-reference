@@ -138,6 +138,8 @@ For the backend, that means:
 
 The WAF and frontend stacks are small enough (single logical unit each) that they keep their resources inline — the construct-extraction pattern is demonstrated on the backend as the reference example.
 
+The three stacks are then composed into a [`cdk.Stage`](hello_world/hello_world_stage.py) — `HelloWorldStage`. A Stage is the CDK best-practice deployment unit: it groups stacks that are always deployed together, scopes synthesis under its own subdirectory (`cdk.out/assembly-{stage}/`), and is the natural boundary for CDK Pipelines. Stack names are set explicitly via `stack_name=` inside the Stage so the CloudFormation names stay as `HelloWorld-{region}` etc. — without the override, the Stage ID would be prepended.
+
 **Generated vs. physical resource names.** Following the ["use generated resource names"](https://docs.aws.amazon.com/cdk/v2/guide/best-practices.html) best practice, the backend does not set `table_name`, `parameter_name`, or `log_group_name` on the DynamoDB table, SSM parameter, Lambda log group, or API Gateway access log group — CDK auto-generates unique names derived from the construct path. This avoids two hazards: (1) replacement-style schema changes can't fail because the physical name is pinned, and (2) two regional deployments can't collide on the same physical name. Explicit names are retained only where AWS itself requires them: the API Gateway execution log group (`API-Gateway-Execution-Logs_{api-id}/{stage}` is a service-fixed format), the WAF log group (`aws-waf-logs-*` prefix is enforced), and the AppConfig L1 constructs (no auto-generation option via CDK).
 
 ## Quick start
@@ -880,6 +882,12 @@ CDK uses context flags to opt into newer behaviors that would otherwise be break
 | `@aws-cdk/aws-iam:minimizePolicies` | Consolidates IAM policy statements for tighter, least-privilege policies |
 
 **Skipped flag:** `@aws-cdk/aws-apigateway:disableCloudWatchRole` is intentionally **not** enabled. It removes the account-level CloudWatch role for API Gateway, which is incompatible with NIST 800-53 R5 — execution logging (`AwsSolutions-APIG6` / `APIGWExecutionLoggingEnabled`) requires that role.
+
+### Commit `cdk.context.json`
+
+The `cdk.context.json` file — distinct from the `cdk.json` context block above — caches environmental lookups (AZs, AMI IDs, hosted zones, SSM parameter values) that CDK resolves at synth time. **It is committed to the repo on purpose.** Per the CDK [best practice](https://docs.aws.amazon.com/cdk/v2/guide/context.html), the same cached values must be used across every synth of a given commit, or templates will drift depending on whose machine ran the build.
+
+If `cdk.context.json` were gitignored, the first synth after a fresh clone would re-resolve every lookup against live AWS APIs and rewrite the file — which means two engineers synthesizing the same commit might produce different CloudFormation templates, and CI might produce yet a third. Committing the file pins the values so the synth is deterministic per commit. To refresh a cached value intentionally, run `cdk context --reset <key>` and commit the resulting diff.
 
 ## Frontend stack
 
