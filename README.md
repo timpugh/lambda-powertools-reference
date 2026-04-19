@@ -14,7 +14,7 @@ This project contains source code and supporting files for a serverless applicat
 - `hello_world/hello_world_stack.py` - The backend CDK stack (Lambda, API Gateway, DynamoDB, SSM, AppConfig)
 - `hello_world/hello_world_waf_stack.py` - The WAF stack (CloudFront-scoped WebACL, always in `us-east-1`)
 - `hello_world/hello_world_frontend_stack.py` - The frontend stack (S3 + CloudFront)
-- `hello_world/nag_utils.py` - Shared cdk-nag suppression list for CDK-managed singleton Lambdas
+- `hello_world/nag_utils.py` - Shared cdk-nag rule-pack helper (`apply_compliance_aspects`) and suppression list for CDK-managed singleton Lambdas
 - `frontend/` - Static assets (`index.html`) deployed to the frontend S3 bucket
 - `events/event.json` - A sample API Gateway proxy event for local SAM invocation
 - `tests/` - Unit and integration tests
@@ -542,7 +542,7 @@ Security is enforced at three layers, each covering a different surface area:
 |---|---|---|---|
 | **Source code** | bandit | `lambda/` and `hello_world/` for security anti-patterns (hardcoded secrets, shell injection, unsafe deserialization, etc.) | Pre-commit hook on every commit; CI quality job |
 | **Dependencies** | pip-audit | All three requirements files for packages with known CVEs | Pre-commit hook on every commit; weekly Dependency Audit workflow |
-| **Infrastructure** | cdk-nag | CDK stacks against AWS Solutions, Serverless, and NIST 800-53 R5 rules | `cdk synth` — findings are printed and fail synthesis if unsuppressed |
+| **Infrastructure** | cdk-nag | CDK stacks against AWS Solutions, Serverless, NIST 800-53 R5, HIPAA Security, and PCI DSS 3.2.1 rules | `cdk synth` — findings are printed and fail synthesis if unsuppressed |
 
 These tools are complementary — no single one covers all three surfaces. Bandit catches code-level issues, pip-audit catches supply chain issues, and cdk-nag catches infrastructure misconfigurations.
 
@@ -757,9 +757,9 @@ This project uses Dependabot rather than Renovate because Dependabot is the GitH
 
 ## CDK security checks
 
-All three stacks use [cdk-nag](https://github.com/cdklabs/cdk-nag) with three rule packs applied to every resource at synth time. Any finding that is not suppressed fails `cdk synth` — infrastructure misconfigurations are caught before deployment, not after.
+All three stacks use [cdk-nag](https://github.com/cdklabs/cdk-nag) with five rule packs applied to every resource at synth time. Any finding that is not suppressed fails `cdk synth` — infrastructure misconfigurations are caught before deployment, not after.
 
-Checks run automatically on every `cdk synth` and `cdk deploy`. There is no separate command needed.
+Checks run automatically on every `cdk synth` and `cdk deploy`. There is no separate command needed. The pack set is attached by a single helper — [`apply_compliance_aspects`](hello_world/nag_utils.py) — that every stack calls in its constructor, so adding or removing a pack is a one-line change in one place.
 
 ### Rule packs in use
 
@@ -768,16 +768,18 @@ Checks run automatically on every `cdk synth` and `cdk deploy`. There is no sepa
 | `AwsSolutionsChecks` | `from cdk_nag import AwsSolutionsChecks` | AWS general best practices — IAM, encryption, logging, resilience |
 | `ServerlessChecks` | `from cdk_nag import ServerlessChecks` | Serverless-specific rules — Lambda DLQ, tracing, memory, throttling |
 | `NIST80053R5Checks` | `from cdk_nag import NIST80053R5Checks` | NIST 800-53 Rev 5 controls — the current standard used by many enterprises and federal workloads |
+| `HIPAASecurityChecks` | `from cdk_nag import HIPAASecurityChecks` | HIPAA Security Rule — required when handling protected health information (PHI) |
+| `PCIDSS321Checks` | `from cdk_nag import PCIDSS321Checks` | PCI DSS 3.2.1 — required when handling payment card data |
+
+Running the HIPAA and PCI packs on top of NIST 800-53 R5 turned out to surface **zero net-new findings** on this stack — every rule that tripped was a same-named counterpart of a rule already raised (and suppressed) by NIST R5 (e.g. `HIPAA.Security-LambdaInsideVPC` duplicates `NIST.800.53.R5-LambdaInsideVPC`). The packs are kept enabled anyway so any future drift that introduces a HIPAA- or PCI-specific control gap is caught at synth time rather than in a later audit.
 
 ### Other available rule packs
 
-cdk-nag ships additional packs that are not enabled in this project. They can be added by importing and applying them the same way as the packs above:
+cdk-nag ships one additional pack that is not enabled in this project. It can be added by importing and applying it the same way as the packs above:
 
 | Pack | Import | When to use |
 |------|--------|-------------|
-| `NIST80053R4Checks` | `from cdk_nag import NIST80053R4Checks` | NIST 800-53 Rev 4 — superseded by R5; only use if your compliance framework specifically requires R4 |
-| `HIPAASecurityChecks` | `from cdk_nag import HIPAASecurityChecks` | HIPAA Security Rule — required when handling protected health information (PHI) |
-| `PCIDSS321Checks` | `from cdk_nag import PCIDSS321Checks` | PCI DSS 3.2.1 — required when handling payment card data |
+| `NIST80053R4Checks` | `from cdk_nag import NIST80053R4Checks` | NIST 800-53 Rev 4 — superseded by R5; only use if your compliance framework specifically requires R4. Running it alongside R5 duplicates findings on overlapping controls. |
 
 Full rule documentation: [github.com/cdklabs/cdk-nag/blob/main/RULES.md](https://github.com/cdklabs/cdk-nag/blob/main/RULES.md)
 
@@ -821,6 +823,8 @@ Current suppressions across all stacks:
 | `NIST.800.53.R5-S3BucketReplicationEnabled` | Frontend | Stack + Resource | Static assets are redeployable; replication not needed |
 | `NIST.800.53.R5-S3BucketVersioningEnabled` | Frontend | Stack + Resource | Static assets are redeployable via `cdk deploy`; versioning not needed |
 | `NIST.800.53.R5-S3DefaultEncryptionKMS` | Frontend | Resource (log bucket only) | S3 log delivery service does not support KMS target buckets; SSE-S3 required |
+| `HIPAA.Security-*` | — | Mirrors the NIST R5 rows above | Every HIPAA Security finding duplicates a NIST R5 counterpart with the same reason (e.g. `HIPAA.Security-LambdaInsideVPC` ↔ `NIST.800.53.R5-LambdaInsideVPC`); suppressions are in the same locations as their NIST R5 twins |
+| `PCI.DSS.321-*` | — | Mirrors the NIST R5 rows above | Same as HIPAA — each PCI finding duplicates a NIST R5 counterpart (e.g. `PCI.DSS.321-S3BucketVersioningEnabled` ↔ `NIST.800.53.R5-S3BucketVersioningEnabled`) and is suppressed alongside it |
 
 Rules that were previously suppressed and have since been implemented are removed from this list. If you add a suppression, include a clear `reason` and consider whether the finding represents a genuine gap worth addressing in production.
 
