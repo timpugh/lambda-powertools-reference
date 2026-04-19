@@ -20,16 +20,26 @@ jobs:
           enable-cache: true
 
       # pip-audit is environment-agnostic — it reads requirements files directly.
-      # Export each conflicting group to a requirements.txt and audit both, so
-      # the `lambda` and `cdk` resolutions are covered by a single job.
+      # Each conflicting group is exported and audited in its own pip-audit call,
+      # so the attrs<26 (cdk) and attrs>=26 (lambda) resolutions never collide
+      # inside pip-audit's dry-run install. Passing all three files to a single
+      # invocation would fail with ResolutionImpossible on attrs.
       - name: Install pip-audit
         run: uv sync --only-group lint
 
       - name: Export each group to a requirements file
         run: |
-          uv export --only-group cdk  --no-emit-project --format requirements.txt -o /tmp/req-cdk.txt
+          uv export --only-group cdk    --no-emit-project --format requirements.txt -o /tmp/req-cdk.txt
           uv export --only-group lambda --no-emit-project --format requirements.txt -o /tmp/req-lambda.txt
-          uv export --only-group test --no-emit-project --format requirements.txt -o /tmp/req-test.txt
+          uv export --only-group test   --no-emit-project --format requirements.txt -o /tmp/req-test.txt
 
       - name: Audit dependencies
-        run: uv run pip-audit -r /tmp/req-cdk.txt -r /tmp/req-lambda.txt -r /tmp/req-test.txt
+        run: |
+          set +e
+          failed=0
+          for group in cdk lambda test; do
+            echo "::group::pip-audit ($group)"
+            uv run pip-audit -r /tmp/req-$group.txt || failed=1
+            echo "::endgroup::"
+          done
+          exit $failed
