@@ -667,10 +667,12 @@ Four workflows are configured:
 
 All three CI jobs must pass before anything can merge to `main` (branch protection).
 
-The CI uses [uv](https://docs.astral.sh/uv/) to install dependencies from the single `uv.lock` at the repo root. Each job syncs only the groups it needs:
-- `quality` job: `uv sync --group cdk --group test --group lint --group docs` (runs pre-commit hooks, which cover every tool across every group)
-- `test` job: `uv sync --only-group lambda --only-group test` into `.venv-lambda` via `UV_PROJECT_ENVIRONMENT=.venv-lambda` — isolates Powertools' `attrs>=26` from CDK's `attrs<26`
-- `cdk-check` job: `uv sync --group cdk --group test` (CDK + pytest) + CDK CLI via `npm install -g aws-cdk`
+The CI uses [uv](https://docs.astral.sh/uv/) to install dependencies from the single `uv.lock` at the repo root. Each job syncs only the groups it needs, passing `--locked` so the job fails loudly if `pyproject.toml` and `uv.lock` are out of sync rather than silently regenerating the lock mid-build:
+- `quality` job: `uv sync --locked --group cdk --group test --group lint --group docs` (runs pre-commit hooks, which cover every tool across every group)
+- `test` job: `uv sync --locked --only-group lambda --only-group test` into `.venv-lambda` via `UV_PROJECT_ENVIRONMENT=.venv-lambda` — isolates Powertools' `attrs>=26` from CDK's `attrs<26`
+- `cdk-check` job: `uv sync --locked --group cdk --group test` (CDK + pytest) + CDK CLI via `npm install -g aws-cdk`
+
+Each job ends with `uv cache prune --ci` before `setup-uv`'s post-step saves the cache. `--ci` drops pre-built wheels (cheap to redownload) and keeps only the expensive-to-rebuild source distributions, shrinking the cached artifact `actions/cache` persists between runs.
 
 The `cdk-check` job runs `cdk synth` to catch unsuppressed cdk-nag findings, then runs `tests/cdk/test_stacks.py` which uses `aws_cdk.assertions.Template` to verify key security properties of each synthesized stack (KMS encryption, DynamoDB PITR, API Gateway caching, CloudFront TLS version, etc.). These tests live under `tests/cdk/` rather than `tests/unit/` so the unit-test autouse fixture (which mocks Powertools internals) does not apply — the cdk-check job intentionally omits Powertools to avoid the `attrs` version conflict. Asset bundling (Docker) is skipped via the `aws:cdk:bundling-stacks` context key so the job runs without Docker build time.
 
