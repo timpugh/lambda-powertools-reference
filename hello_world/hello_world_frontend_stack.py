@@ -343,6 +343,23 @@ class HelloWorldFrontendStack(Stack):
                 },
             ],
         )
+        # The guest role has a single least-privilege permission — rum:PutRumEvents
+        # on exactly one monitor ARN — tightly bound to this role's one purpose.
+        # A managed policy would add indirection without changing the security
+        # posture, since the policy is used by nothing else and is scoped to a
+        # resource that is itself one-to-one with the role.
+        inline_policy_reason = (
+            "Single least-privilege inline policy (rum:PutRumEvents on one monitor ARN) "
+            "is tightly bound to this role's sole purpose — anonymous browser telemetry upload"
+        )
+        NagSuppressions.add_resource_suppressions(
+            rum_unauth_role,
+            [
+                {"id": "NIST.800.53.R5-IAMNoInlinePolicy", "reason": inline_policy_reason},
+                {"id": "HIPAA.Security-IAMNoInlinePolicy", "reason": inline_policy_reason},
+                {"id": "PCI.DSS.321-IAMNoInlinePolicy", "reason": inline_policy_reason},
+            ],
+        )
 
         # ── Explicit log group for the CDK auto-delete Lambda ────────────────
         # CDK creates a singleton Lambda to empty the bucket before deletion.

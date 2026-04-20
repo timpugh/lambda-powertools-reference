@@ -816,7 +816,7 @@ Current suppressions across all stacks:
 | `NIST.800.53.R5-LambdaConcurrency` | Backend, Frontend | Per-resource (CDK singletons) | CDK-managed singleton Lambdas — concurrency is not configurable |
 | `NIST.800.53.R5-LambdaDLQ` | Backend, Frontend | Per-resource (CDK singletons) | CDK-managed Lambdas — DLQ is not configurable; `HelloWorldFunction` is synchronously invoked |
 | `NIST.800.53.R5-LambdaInsideVPC` | Backend, Frontend | Per-resource (CDK singletons) | CDK-managed singleton Lambdas — VPC is not configurable |
-| `NIST.800.53.R5-IAMNoInlinePolicy` | Backend, Frontend, WAF | Per-resource | CDK-generated inline policies on singleton service roles — not directly configurable |
+| `NIST.800.53.R5-IAMNoInlinePolicy` | Backend, Frontend, WAF | Per-resource | CDK-generated inline policies on singleton service roles — not directly configurable; also suppressed on `RumUnauthenticatedRole` where the single least-privilege `rum:PutRumEvents` policy is tightly bound to the role's one purpose |
 | `NIST.800.53.R5-APIGWAssociatedWithWAF` | Backend | Stack | WAF applied at CloudFront, not directly on API Gateway |
 | `NIST.800.53.R5-APIGWSSLEnabled` | Backend | Stack | Client-side SSL certificates not required for sample app |
 | `NIST.800.53.R5-DynamoDBInBackupPlan` | Backend | Stack | AWS Backup plan not configured; PITR is enabled for point-in-time recovery |
