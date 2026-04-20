@@ -19,7 +19,7 @@ dependencies = []
 # Lambda runtime — ships in the deployment bundle AND is installed locally
 # for unit tests that import `lambda/app.py`.
 lambda = [
-    "aws-lambda-powertools[all]==3.27.0",
+    "aws-lambda-powertools[all]==3.28.0",
     "aws-xray-sdk==2.15.0",
     "boto3==1.42.87",
 ]
