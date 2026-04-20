@@ -17,6 +17,9 @@ from aws_cdk import (
     aws_cloudfront_origins as origins,
 )
 from aws_cdk import (
+    aws_cognito as cognito,
+)
+from aws_cdk import (
     aws_glue as glue,
 )
 from aws_cdk import (
@@ -27,6 +30,9 @@ from aws_cdk import (
 )
 from aws_cdk import (
     aws_logs as logs,
+)
+from aws_cdk import (
+    aws_rum as rum,
 )
 from aws_cdk import (
     aws_s3 as s3,
@@ -203,16 +209,89 @@ class HelloWorldFrontendStack(Stack):
             log_file_prefix="cloudfront/",
         )
 
+        # ── CloudWatch RUM + X-Ray ───────────────────────────────────────────
+        # RUM collects browser telemetry (page loads, JS errors, fetch latency)
+        # and — with enable_x_ray — emits a client-side trace segment that joins
+        # the backend Lambda/API Gateway segments into a single X-Ray trace.
+        # Guest (unauthenticated) browsers authenticate via Cognito Identity
+        # Pool → STS AssumeRoleWithWebIdentity → scoped rum:PutRumEvents role.
+        # The monitor ARN is constructed from the known monitor name so the
+        # IAM role can reference it without a circular dependency on the
+        # CfnAppMonitor resource.
+        rum_identity_pool = cognito.CfnIdentityPool(
+            self,
+            "RumIdentityPool",
+            allow_unauthenticated_identities=True,
+            identity_pool_name=f"{self.stack_name}-rum",
+        )
+        rum_monitor_name = f"{self.stack_name}-rum"
+        rum_monitor_arn = f"arn:{self.partition}:rum:{self.region}:{self.account}:appmonitor/{rum_monitor_name}"
+        rum_unauth_role = iam.Role(
+            self,
+            "RumUnauthenticatedRole",
+            assumed_by=iam.FederatedPrincipal(
+                "cognito-identity.amazonaws.com",
+                conditions={
+                    "StringEquals": {"cognito-identity.amazonaws.com:aud": rum_identity_pool.ref},
+                    "ForAnyValue:StringLike": {"cognito-identity.amazonaws.com:amr": "unauthenticated"},
+                },
+                assume_role_action="sts:AssumeRoleWithWebIdentity",
+            ),
+            description=f"Guest role assumed by browser RUM clients for {rum_monitor_name}",
+            inline_policies={
+                "AllowPutRumEvents": iam.PolicyDocument(
+                    statements=[
+                        iam.PolicyStatement(
+                            actions=["rum:PutRumEvents"],
+                            resources=[rum_monitor_arn],
+                        )
+                    ]
+                )
+            },
+        )
+        cognito.CfnIdentityPoolRoleAttachment(
+            self,
+            "RumIdentityPoolRoleAttachment",
+            identity_pool_id=rum_identity_pool.ref,
+            roles={"unauthenticated": rum_unauth_role.role_arn},
+        )
+        rum_app_monitor = rum.CfnAppMonitor(
+            self,
+            "RumAppMonitor",
+            name=rum_monitor_name,
+            domain=distribution.distribution_domain_name,
+            cw_log_enabled=True,
+            app_monitor_configuration=rum.CfnAppMonitor.AppMonitorConfigurationProperty(
+                allow_cookies=True,
+                enable_x_ray=True,
+                session_sample_rate=1.0,
+                telemetries=["errors", "performance", "http"],
+                identity_pool_id=rum_identity_pool.ref,
+                guest_role_arn=rum_unauth_role.role_arn,
+            ),
+        )
+
         # ── Deploy frontend assets ───────────────────────────────────────────
         # Uploads frontend/ to S3 and generates config.json with the API URL
-        # injected at deploy time. Triggers a CloudFront invalidation so the
-        # new assets are served immediately without waiting for cache expiry.
+        # and RUM client config injected at deploy time. Triggers a CloudFront
+        # invalidation so new assets are served immediately without waiting
+        # for cache expiry.
         s3deploy.BucketDeployment(
             self,
             "DeployFrontend",
             sources=[
                 s3deploy.Source.asset("frontend"),
-                s3deploy.Source.json_data("config.json", {"apiUrl": api_url}),
+                s3deploy.Source.json_data(
+                    "config.json",
+                    {
+                        "apiUrl": api_url,
+                        "rum": {
+                            "appMonitorId": rum_app_monitor.attr_id,
+                            "identityPoolId": rum_identity_pool.ref,
+                            "region": self.region,
+                        },
+                    },
+                ),
             ],
             destination_bucket=bucket,
             distribution=distribution,
@@ -237,6 +316,32 @@ class HelloWorldFrontendStack(Stack):
             "FrontendBucketName",
             description="S3 bucket storing the frontend static assets",
             value=bucket.bucket_name,
+        )
+        CfnOutput(
+            self,
+            "RumAppMonitorId",
+            description="CloudWatch RUM app monitor ID — used by the browser RUM client",
+            value=rum_app_monitor.attr_id,
+        )
+        CfnOutput(
+            self,
+            "RumIdentityPoolId",
+            description="Cognito Identity Pool ID — used by the browser RUM client for guest credentials",
+            value=rum_identity_pool.ref,
+        )
+
+        # ── RUM / Cognito cdk-nag suppressions ───────────────────────────────
+        # Unauthenticated identities are intentional — browsers have no prior
+        # identity and RUM's guest-credentials model is the standard pattern.
+        # The role's only permission is rum:PutRumEvents on this monitor.
+        NagSuppressions.add_resource_suppressions(
+            rum_identity_pool,
+            [
+                {
+                    "id": "AwsSolutions-COG7",
+                    "reason": "RUM requires unauthenticated guest credentials for anonymous browser telemetry",
+                },
+            ],
         )
 
         # ── Explicit log group for the CDK auto-delete Lambda ────────────────

@@ -64,6 +64,41 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
+  <script>
+    // CloudWatch RUM client — fetches config.json synchronously in <head> so
+    // the RUM snippet can initialize before the app code runs. enableXRay=true
+    // makes the client attach an X-Amzn-Trace-Id header to outbound fetch()
+    // calls so browser spans join the backend API Gateway + Lambda trace.
+    (function () {
+      const configPromise = fetch("/config.json").then(function (r) { return r.json(); });
+      window.__appConfigPromise = configPromise;
+      configPromise.then(function (cfg) {
+        if (!cfg || !cfg.rum || !cfg.rum.appMonitorId) return;
+        (function (n, i, v, r, s, c, x, z) {
+          x = window.AwsRumClient = { q: [], n: n, i: i, v: v, r: r, c: c };
+          window[n] = function (c, p) { x.q.push({ c: c, p: p }); };
+          z = document.createElement("script");
+          z.async = true;
+          z.src = s;
+          document.head.insertBefore(z, document.head.getElementsByTagName("script")[0]);
+        })(
+          "cwr",
+          cfg.rum.appMonitorId,
+          "1.0.0",
+          cfg.rum.region,
+          "https://client.rum.us-east-1.amazonaws.com/1.21.0/cwr.js",
+          {
+            sessionSampleRate: 1,
+            identityPoolId: cfg.rum.identityPoolId,
+            endpoint: "https://dataplane.rum." + cfg.rum.region + ".amazonaws.com",
+            telemetries: ["performance", "errors", "http"],
+            allowCookies: true,
+            enableXRay: true,
+          }
+        );
+      }).catch(function () { /* config missing — skip RUM init */ });
+    })();
+  </script>
 </head>
 <body>
   <div class="card">
@@ -80,8 +115,7 @@
     const response = document.getElementById("response");
 
     async function getApiUrl() {
-      const res = await fetch("/config.json");
-      const cfg = await res.json();
+      const cfg = await (window.__appConfigPromise ?? fetch("/config.json").then((r) => r.json()));
       return cfg.apiUrl;
     }
 

@@ -276,6 +276,10 @@ class HelloWorldApp(Construct):
         hello_resource.add_cors_preflight(
             allow_origins=apigw.Cors.ALL_ORIGINS,
             allow_methods=["GET", "OPTIONS"],
+            # X-Amzn-Trace-Id is required for CloudWatch RUM to propagate the
+            # client-side X-Ray trace header into the API Gateway → Lambda
+            # segments so the browser and backend appear on the same trace.
+            allow_headers=[*apigw.Cors.DEFAULT_HEADERS, "X-Amzn-Trace-Id"],
         )
 
         # Explicit execution log group — API Gateway creates this outside CloudFormation
