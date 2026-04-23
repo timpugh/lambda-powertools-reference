@@ -21,7 +21,7 @@ dependencies = []
 lambda = [
     "aws-lambda-powertools[all]==3.27.0",
     "aws-xray-sdk==2.15.0",
-    "boto3==1.42.87",
+    "boto3==1.42.91",
 ]
 
 # CDK infrastructure — used by `app.py`, `hello_world/`, and the CDK stack
@@ -59,7 +59,7 @@ lint = [
     "bandit==1.9.4",
     "pip-audit==2.10.0",
     "pre-commit==4.5.1",
-    "boto3-stubs==1.42.88",
+    "boto3-stubs==1.42.91",
 ]
 
 # Documentation build — used only by `make docs`. The Zensical static site
