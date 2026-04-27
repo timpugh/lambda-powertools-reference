@@ -666,7 +666,7 @@ Four workflows are configured:
 | **CI** | Push / PR to `main` | Three jobs: pre-commit hooks (`quality`), pytest unit tests (`test`), CDK synth + stack assertion tests (`cdk-check`) |
 | **Docs** | Push to `main` | Builds Zensical docs and deploys to GitHub Pages |
 | **Dependency Audit** | Every Monday 9am UTC | Runs `pip-audit` against each dependency group exported from `uv.lock` |
-| **Dependabot Auto-merge** | Dependabot PRs | Approves and auto-merges GitHub Actions version updates when CI passes |
+| **Dependabot Auto-merge** | Dependabot PRs | Approves and auto-merges patch/minor updates from both ecosystems (GitHub Actions + uv) when CI passes; majors stay manual |
 
 All three CI jobs must pass before anything can merge to `main` (branch protection).
 
@@ -686,15 +686,15 @@ Dependabot is configured in `.github/dependabot.yml` to check for updates every 
 | Ecosystem | What it checks | Auto-merge? |
 |-----------|----------------|-------------|
 | `github-actions` | Workflow YAML for newer action versions (e.g. `actions/checkout@v4` → `v5`) | Patch and minor updates auto-merge via the `dependabot-auto-merge` workflow once CI passes; major updates require human review |
-| `uv` | `pyproject.toml` + `uv.lock` — every dependency group in one lock file, regenerated atomically | No — Python PRs are held for human review |
+| `uv` | `pyproject.toml` + `uv.lock` — every dependency group in one lock file, regenerated atomically | Patch and minor updates auto-merge once CI passes; major updates require human review. Updates that touch the `lambda` runtime group (e.g. `boto*`, `aws-lambda-powertools`) need a one-time `make lock` push from a maintainer before CI greens — see "Python (`uv`) updates" below |
 
-For GitHub Actions patch and minor updates, the `dependabot-auto-merge` workflow:
-1. Confirms the PR is a GitHub Actions ecosystem update
-2. Checks that `dependabot/fetch-metadata` reports the update type as `version-update:semver-patch` or `version-update:semver-minor`
-3. Approves the PR
-4. Enables auto-merge — GitHub merges it automatically once CI passes
+The `dependabot-auto-merge` workflow runs on every Dependabot PR and approves + arms auto-merge when **all** of the following hold:
+1. `dependabot/fetch-metadata` reports the ecosystem as `github_actions` or `uv`
+2. `dependabot/fetch-metadata` reports the update type as `version-update:semver-patch` or `version-update:semver-minor`
 
-Major updates (e.g. `actions/upload-artifact@v4 → @v7`) intentionally fall through to manual review because they can contain breaking input/output changes and warrant a human glance at the changelog.
+Once auto-merge is armed, GitHub itself waits for required status checks (the `quality`, `test`, and `cdk-check` jobs) to pass and then merges the PR. If any check fails, the PR stays open with auto-merge enabled but unsatisfied, surfacing the failure rather than silently merging.
+
+Major updates (e.g. `actions/upload-artifact@v4 → @v7`, or an aws-cdk major bump) intentionally fall through to manual review because cooldowns catch *malicious* releases but not intentional API breaks, and majors warrant a human glance at the changelog.
 
 If CI fails on a Dependabot PR (any ecosystem), it stays open for investigation rather than merging.
 
@@ -708,9 +708,27 @@ All Python dependencies live in a single `pyproject.toml` with five groups (`lam
 
 **Grouped updates collapse the PR volume.** The uv ecosystem entry in `dependabot.yml` defines `groups:` that bundle related packages into a single PR — `aws-cdk*`/`constructs` update together, `aws-*`/`boto*`/`botocore`/`s3transfer` update together, `pytest` and its plugins update together, docs tooling together, linting tooling together, all remaining patch bumps roll into one weekly "patches" PR. Within a group, Dependabot regenerates `uv.lock` in one shot, so the cross-package version skew that would otherwise hit boto3+botocore+aws-lambda-powertools (when each is bumped in isolation) cannot happen. Major and minor bumps outside these groups still get individual PRs so each changelog can be reviewed on its own.
 
-**Merge flow.** A Dependabot uv PR updates `pyproject.toml` + `uv.lock` in lockstep. CI re-syncs each job's venv from the new lock, runs the test suite against both resolutions (CDK venv in `cdk-check`, Lambda venv in `test`), and the PR merges manually after review. There is no per-tier recompile step, no Case 1/2/3 handling — the single lock file is always internally consistent.
+**Merge flow.** A Dependabot uv PR updates `pyproject.toml` + `uv.lock` in lockstep. CI re-syncs each job's venv from the new lock and runs the test suite against both resolutions (CDK venv in `cdk-check`, Lambda venv in `test`). Patch and minor PRs auto-merge once CI greens; majors stay open for human review. There is no per-tier recompile step, no Case 1/2/3 handling — the single lock file is always internally consistent.
 
-**Regenerating `lambda/requirements.txt`.** The packaged Lambda still installs from a flat `requirements.txt` at deploy time (CDK's `PythonFunction` construct expects one). That file is generated from `uv.lock` via `uv export --only-group lambda --no-emit-project` and is treated as a build artifact, not a source of truth. `make lock` regenerates both `uv.lock` and `lambda/requirements.txt` together so they never drift.
+**When a `make lock` push is required.** The packaged Lambda installs from a flat `lambda/requirements.txt` at deploy time (CDK's `PythonFunction` construct expects one). That file is generated from `uv.lock` via `uv export --only-group lambda --no-emit-project` and is treated as a build artifact. The `quality` job in CI re-runs that export and fails if the committed file drifts from what the current `uv.lock` would produce — this is what stops a stale `requirements.txt` from shipping to production Lambda when Dependabot bumps a runtime dep.
+
+Dependabot updates `uv.lock` but **not** the exported `requirements.txt`, so any uv PR that touches the `lambda` group (`aws-lambda-powertools`, `boto*`, `botocore`, `aws-encryption-sdk`, etc.) will fail the drift check on first CI run. The PR sits open with auto-merge already armed, waiting on the failing check. To unblock it, a maintainer runs:
+
+```bash
+gh pr checkout <pr-number>     # check out the Dependabot branch
+make lock                      # regenerates lambda/requirements.txt from uv.lock
+git add lambda/requirements.txt
+git commit -m "chore: regenerate lambda/requirements.txt"
+git push
+```
+
+The push triggers a fresh CI run; once it greens, the auto-merge that was already armed fires and GitHub merges the PR. No second approval click is needed.
+
+PRs that only touch non-lambda groups (`aws-cdk`, `pytest`, `docs`, `linting`) do not drift `lambda/requirements.txt` and merge themselves with no maintainer involvement.
+
+This compromise — auto-merge for everything, with a manual `make lock` push for lambda-runtime updates — was chosen because the alternative paths each carry their own cost: a Personal Access Token would let the workflow regenerate and push automatically (GitHub's `GITHUB_TOKEN` deliberately does not retrigger workflows on its own pushes, so a workflow-managed regeneration would stall auto-merge forever), but adds a long-lived credential to manage and rotate. Treating `lambda/requirements.txt` as a fully-generated artifact (regenerated at synth time, not committed) would remove the drift check entirely, but adds a build step before every `cdk synth` and forfeits the ability to inspect the exact pinned dependency set at any commit. The current setup keeps both the credential surface and the build pipeline unchanged at the cost of one occasional manual step.
+
+Run `make lock` locally any time you change `pyproject.toml` so both files move together — never hand-edit `lambda/requirements.txt`.
 
 **Useful Dependabot commands.** When a PR becomes stale relative to `main` (shown as `BEHIND` in `gh pr view`), comment `@dependabot rebase` on the PR to trigger a fresh rebase and CI run. Other useful commands include `@dependabot recreate` (regenerates the PR from scratch) and `@dependabot ignore this version` (skip a specific release). The full command list is at <https://docs.github.com/en/code-security/dependabot/working-with-dependabot/managing-pull-requests-for-dependency-updates>.
 
@@ -730,7 +748,7 @@ Tag references are mutable — a compromised maintainer account can rewrite `v6`
 
 **3. Hash-locked installs.** `uv.lock` records a SHA256 for every wheel and sdist it resolves, and `uv sync` refuses to install anything whose on-disk hash does not match. The `lambda/requirements.txt` artifact exported from the lock for the deployed Lambda is generated with hashes too. Even if an attacker uploads a malicious version under an existing version number (e.g. after yanking the legitimate one), the install refuses it because the hash does not match.
 
-**4. Restricted auto-merge.** Auto-merge is scoped to patch and minor GitHub Actions updates only (see above). Python (uv) updates never auto-merge, regardless of the update type, because they ship to production Lambda. Majors in either ecosystem require human review.
+**4. Restricted auto-merge.** Auto-merge is scoped to patch and minor updates only — never majors. Both ecosystems (GitHub Actions and uv) qualify, but uv updates that touch the `lambda` runtime group fail CI's `lambda/requirements.txt` drift check and require a one-time `make lock` push before they can merge (see "Python (`uv`) updates" above). The drift check is what makes uv auto-merge safe: it physically blocks any uv lock change from reaching `main` until the exported requirements file that the production Lambda actually installs from has been regenerated and reviewed alongside the lock. Combined with the cooldown (#1), the SHA pins (#2), and the hash-locked installs (#3), a malicious uv release cannot land on `main` without surviving 3–14 days of cooldown, hash verification at install time, and (for runtime deps) the human-driven `make lock` step.
 
 **5. Local cooldown on `make upgrade`.** Dependabot's cooldown protects every dependency change that lands via a PR, but `make upgrade` runs locally on a developer laptop and bypasses Dependabot entirely. The Makefile mirrors the same defense by passing uv's `--exclude-newer` flag to `uv lock --upgrade`, filtering out any package version uploaded after a cutoff computed from `COOLDOWN_DAYS` (default 7). Override at the command line if you need to pull a fresher version: `make upgrade COOLDOWN_DAYS=1`. The cooldown is intentionally **only** applied to `upgrade`, not `lock`. `lock` reproduces decisions already encoded in `pyproject.toml` and the existing `uv.lock` — it cannot introduce a brand-new version, so cooldown is unnecessary and would actively conflict with freshly-bumped pins. `upgrade` is the only target where new versions enter the project and is the only place a fresh malicious release can land. Disable entirely with `COOLDOWN_DAYS=0`.
 
@@ -753,7 +771,7 @@ Everything else in this section is *prevention*; honeytokens are *detection*. Th
 - Renovate supports richer grouping rules (e.g., regex-based bundling, per-manager overrides) and auto-merge rules scoped by update type (patch/minor/major) for Python PRs.
 - Renovate runs as a GitHub App, so it is zero-infrastructure.
 
-This project uses Dependabot because it is the GitHub-native default and already integrated into the repo for GitHub Actions updates. The `uv` ecosystem support closed the gap that previously made Renovate compelling for the pip-tools constraint chain. If you extend this pattern to a production repo that wants auto-merge for non-major Python updates, Renovate is still the lower-friction choice.
+This project uses Dependabot because it is the GitHub-native default and already integrated into the repo for GitHub Actions updates. The `uv` ecosystem support closed the gap that previously made Renovate compelling for the pip-tools constraint chain. The remaining Renovate edge is its [post-upgrade tasks](https://docs.renovatebot.com/configuration-options/#postupgradetasks) feature, which lets the bot regenerate `lambda/requirements.txt` in the same PR commit as the `uv.lock` bump (eliminating the manual `make lock` push that lambda-runtime updates currently require). For this repo the trade-off didn't pencil out — keeping a single bot integrated with GitHub-native auto-merge is simpler than running two — but a higher-volume production repo that wanted fully unattended uv merges would find Renovate's post-upgrade tasks worth installing for that one feature.
 
 ## CDK security checks
 

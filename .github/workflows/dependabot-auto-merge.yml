@@ -32,3 +32,24 @@ jobs:
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Same patch/minor scope as the GitHub Actions step above. Majors stay
+      # manual because cooldowns catch malicious releases but not intentional
+      # API breaks (aws-cdk synthesis changes, aws-lambda-powertools middleware
+      # rewrites, boto deprecated method removals).
+      #
+      # For uv updates that touch the lambda runtime group (boto*, aws-lambda-
+      # powertools, etc.), CI's drift check on lambda/requirements.txt will
+      # fail and the PR will sit with auto-merge armed. Run `make lock` locally
+      # on the PR branch and push — CI re-runs, passes, and GitHub merges.
+      - name: Approve and auto-merge patch/minor uv updates
+        if: |
+          steps.metadata.outputs.package-ecosystem == 'uv' &&
+          (steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+           steps.metadata.outputs.update-type == 'version-update:semver-minor')
+        run: |
+          gh pr review --approve "$PR_URL"
+          gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
