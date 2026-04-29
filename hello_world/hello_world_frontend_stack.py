@@ -285,9 +285,7 @@ class HelloWorldFrontendStack(Stack):
             ),
         )
 
-        rum_extended_metrics = self._wire_rum_metrics_extras(
-            rum_app_monitor, rum_monitor_name, rum_monitor_arn
-        )
+        rum_extended_metrics = self._wire_rum_metrics_extras(rum_app_monitor, rum_monitor_name, rum_monitor_arn)
 
         # ── Deploy frontend assets ───────────────────────────────────────────
         # Uploads frontend/ to S3 and generates config.json with the API URL
@@ -551,18 +549,32 @@ class HelloWorldFrontendStack(Stack):
         http4xx_status = ',"event_details":{"response":{"status":[{"numeric":[">=",400,"<",500]}]}}'
         page_pat = '{"event_type":["com.amazon.rum.page_view_event"],"metadata":{"pageId":[{"exists":true}]}}'
         defs: list[dict[str, Any]] = [
-            {"Name": "JsErrorCount", "EventPattern": js_pat.format(k="browserName"),
-             "DimensionKeys": {"metadata.browserName": "BrowserName"}},
-            {"Name": "JsErrorCount", "EventPattern": js_pat.format(k="deviceType"),
-             "DimensionKeys": {"metadata.deviceType": "DeviceType"}},
-            {"Name": "JsErrorCount", "EventPattern": js_pat.format(k="countryCode"),
-             "DimensionKeys": {"metadata.countryCode": "CountryCode"}},
-            {"Name": "Http4xxCount", "EventPattern": http_pat.format(s=http4xx_status),
-             "DimensionKeys": {"metadata.browserName": "BrowserName"}},
-            {"Name": "Http5xxCount", "EventPattern": http_pat.format(s=""),
-             "DimensionKeys": {"metadata.browserName": "BrowserName"}},
-            {"Name": "PageViewCount", "EventPattern": page_pat,
-             "DimensionKeys": {"metadata.pageId": "PageId"}},
+            {
+                "Name": "JsErrorCount",
+                "EventPattern": js_pat.format(k="browserName"),
+                "DimensionKeys": {"metadata.browserName": "BrowserName"},
+            },
+            {
+                "Name": "JsErrorCount",
+                "EventPattern": js_pat.format(k="deviceType"),
+                "DimensionKeys": {"metadata.deviceType": "DeviceType"},
+            },
+            {
+                "Name": "JsErrorCount",
+                "EventPattern": js_pat.format(k="countryCode"),
+                "DimensionKeys": {"metadata.countryCode": "CountryCode"},
+            },
+            {
+                "Name": "Http4xxCount",
+                "EventPattern": http_pat.format(s=http4xx_status),
+                "DimensionKeys": {"metadata.browserName": "BrowserName"},
+            },
+            {
+                "Name": "Http5xxCount",
+                "EventPattern": http_pat.format(s=""),
+                "DimensionKeys": {"metadata.browserName": "BrowserName"},
+            },
+            {"Name": "PageViewCount", "EventPattern": page_pat, "DimensionKeys": {"metadata.pageId": "PageId"}},
         ]
         batch_create = cr.AwsSdkCall(
             service="rum",
