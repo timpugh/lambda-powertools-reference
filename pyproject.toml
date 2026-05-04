@@ -65,7 +65,7 @@ lint = [
 # Documentation build — used only by `make docs`. The Zensical static site
 # generator is pre-1.0, so versions are pinned exactly.
 docs = [
-    "zensical==0.0.37",
+    "zensical==0.0.40",
     "mkdocstrings==1.0.4",
     "mkdocstrings-python==2.0.3",
 ]
