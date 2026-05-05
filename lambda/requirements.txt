@@ -17,9 +17,9 @@ aws-xray-sdk==2.15.0 \
     --hash=sha256:422d62ad7d52e373eebb90b642eb1bb24657afe03b22a8df4a8b2e5108e278a3 \
     --hash=sha256:794381b96e835314345068ae1dd3b9120bd8b4e21295066c37e8814dbb341365
     # via aws-lambda-powertools
-boto3==1.43.2 \
-    --hash=sha256:796e859cfb5e93c55276ce746f8020f691eda6b68a0ec4ce4f6fd07a1cca6859 \
-    --hash=sha256:be951cc22769fbcda73fac523b031ee38db45c3ae2b0d828c76b8f6e8e683073
+boto3==1.42.96 \
+    --hash=sha256:2f4566da2c209a98bdbfc874d813ef231c84ad24e4f815e9bc91de5f63351a24 \
+    --hash=sha256:b38a9e4a3fbbee9017252576f1379780d0a5814768676c08df2f539d31fcdd68
     # via aws-encryption-sdk
 botocore==1.42.97 \
     --hash=sha256:5c0bb00e32d16ff6d278cc8c9e10dc3672d9c1d569031635ac3c908a60de8310 \
