@@ -6,9 +6,9 @@ attrs==26.1.0 \
     --hash=sha256:c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309 \
     --hash=sha256:d03ceb89cb322a8fd706d4fb91940737b6642aa36998fe130a9bc96c985eff32
     # via aws-encryption-sdk
-aws-encryption-sdk==4.0.5 \
-    --hash=sha256:3e6b76afb94c28730487dee71fa1bfc217fcdbab061733c220ff87b88630e40e \
-    --hash=sha256:a36136181a4d63cbf0d7347d29786c80a4d74a07c79c88a8799e27b27a9c3fc1
+aws-encryption-sdk==4.0.6 \
+    --hash=sha256:35f62f775a8d4a6cb677a4a8927bb19acb3da35308405213f668396ee6298ad4 \
+    --hash=sha256:ec03bfa2df64ef21417bd6ff749bb63e84149586a4f7fbe528ec6b443326ea9e
     # via aws-lambda-powertools
 aws-lambda-powertools==3.29.0 \
     --hash=sha256:a81ce122356343878e095a11bd38f3e9a70f3fa0fea57b10b327d1e8dfe82b6e \
@@ -17,13 +17,13 @@ aws-xray-sdk==2.15.0 \
     --hash=sha256:422d62ad7d52e373eebb90b642eb1bb24657afe03b22a8df4a8b2e5108e278a3 \
     --hash=sha256:794381b96e835314345068ae1dd3b9120bd8b4e21295066c37e8814dbb341365
     # via aws-lambda-powertools
-boto3==1.43.2 \
-    --hash=sha256:796e859cfb5e93c55276ce746f8020f691eda6b68a0ec4ce4f6fd07a1cca6859 \
-    --hash=sha256:be951cc22769fbcda73fac523b031ee38db45c3ae2b0d828c76b8f6e8e683073
+boto3==1.43.24 \
+    --hash=sha256:b18ef745274ef548a9660d733d985d4a971b16bd8a6af88165ea9d0e40913b86 \
+    --hash=sha256:ba5afa266bf7265e0c1a454fcfd48bffe5939cb16ed223bebc669c3dc8ee0bc8
     # via aws-encryption-sdk
-botocore==1.43.4 \
-    --hash=sha256:1a95c90fa9ca6ee85c1a02b04c8e05e948661d201b85b443000d676857905019 \
-    --hash=sha256:f1897d3254965cacac7514cfed1b6ff016166b165ee2e06232b4a3954cf9d713
+botocore==1.43.24 \
+    --hash=sha256:0c02f2b40e99419d496ece0ea2dcdedb5c45998c16fd1674276c7dbb30767a16 \
+    --hash=sha256:42903b4bfafd8f15a735ed940473f28e4ba21b2ea67a9b9aaa11dfa7fcb19fd5
     # via
     #   aws-xray-sdk
     #   boto3
@@ -129,9 +129,9 @@ pycparser==3.0 ; implementation_name != 'PyPy' and platform_python_implementatio
     --hash=sha256:600f49d217304a5902ac3c37e1281c9fe94e4d0489de643a9504c5cdfdfc6b29 \
     --hash=sha256:b727414169a36b7d524c1c3e31839a521725078d7b2ff038656844266160a992
     # via cffi
-pydantic==2.13.3 \
-    --hash=sha256:6db14ac8dfc9a1e57f87ea2c0de670c251240f43cb0c30a5130e9720dc612927 \
-    --hash=sha256:af09e9d1d09f4e7fe37145c1f577e1d61ceb9a41924bf0094a36506285d0a84d
+pydantic==2.13.4 \
+    --hash=sha256:45a282cde31d808236fd7ea9d919b128653c8b38b393d1c4ab335c62924d9aba \
+    --hash=sha256:c40756b57adaa8b1efeeced5c196f3f3b7c435f90e84ea7f443901bec8099ef6
     # via
     #   aws-lambda-powertools
     #   pydantic-settings
@@ -183,9 +183,9 @@ pydantic-core==2.46.3 \
     --hash=sha256:ff5e7783bcc5476e1db448bf268f11cb257b1c276d3e89f00b5727be86dd0127 \
     --hash=sha256:ffe0883b56cfc05798bf994164d2b2ff03efe2d22022a2bb080f3b626176dd56
     # via pydantic
-pydantic-settings==2.14.0 \
-    --hash=sha256:24285fd4b0e0c06507dd9fdfd331ee23794305352aaec8fc4eb92d4047aeb67d \
-    --hash=sha256:fc8d5d692eb7092e43c8647c1c35a3ecd00e040fcf02ed86f4cb5458ca62182e
+pydantic-settings==2.14.1 \
+    --hash=sha256:6e3c7edfd8277687cdc598f56e5cff0e9bfff0910a3749deaa8d4401c3a2b9de \
+    --hash=sha256:e874d3bec7e787b0c9958277956ed9b4dd5de6a80e162188fdaff7c5e26fd5fa
     # via aws-lambda-powertools
 python-dateutil==2.9.0.post0 \
     --hash=sha256:37dd54208da7e1cd875388217d5e00ebd4179249f90fb72437e91a35459a0ad3 \
