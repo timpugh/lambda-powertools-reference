@@ -37,7 +37,7 @@ lambda = [
 cdk = [
     "aws-cdk-lib==2.248.0",
     "constructs==10.6.0",
-    "aws-cdk-aws-lambda-python-alpha==2.248.0a0",
+    "aws-cdk-aws-lambda-python-alpha==2.258.1a0",
     "cdk-monitoring-constructs==9.22.2",
     "cdk-nag==2.37.55",
 ]
