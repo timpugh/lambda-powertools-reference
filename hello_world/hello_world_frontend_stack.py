@@ -221,7 +221,7 @@ class HelloWorldFrontendStack(Stack):
         frontend_encryption_key = kms.Key(
             self,
             "FrontendEncryptionKey",
-            description=f"KMS key for {self.stack_name} S3 bucket and log groups",
+            description=f"KMS key for {self.stack_name} S3 bucket and log groups [cdk-diff smoke test]",
             enable_key_rotation=True,
             # See HelloWorldApp.encryption_key for the rationale — automated
             # rotation, no dependent redeploys, 90-day compliance baseline.

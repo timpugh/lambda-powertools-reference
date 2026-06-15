@@ -68,7 +68,7 @@ class HelloWorldDataStack(Stack):
         self.encryption_key = kms.Key(
             self,
             "DataEncryptionKey",
-            description=f"KMS key for {self.stack_name} DynamoDB",
+            description=f"KMS key for {self.stack_name} DynamoDB [cdk-diff smoke test]",
             enable_key_rotation=True,
             rotation_period=Duration.days(90),
             removal_policy=removal_policy,

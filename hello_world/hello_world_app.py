@@ -156,7 +156,7 @@ class HelloWorldApp(Construct):
         self.encryption_key = kms.Key(
             self,
             "EncryptionKey",
-            description=f"KMS key for {stack.stack_name} log groups, Lambda env, AppConfig, and SNS",
+            description=f"KMS key for {stack.stack_name} log groups, Lambda env, AppConfig, and SNS [cdk-diff smoke test]",
             enable_key_rotation=True,
             # 90 days is a common compliance-aligned cadence (PCI/HIPAA forks
             # default to 90). Rotation is fully managed by AWS — key ID/ARN

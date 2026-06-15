@@ -55,7 +55,7 @@ class HelloWorldWafStack(Stack):
         waf_encryption_key = kms.Key(
             self,
             "WafEncryptionKey",
-            description=f"KMS key for {self.stack_name} provider log group encryption",
+            description=f"KMS key for {self.stack_name} provider log group encryption [cdk-diff smoke test]",
             enable_key_rotation=True,
             # See HelloWorldApp.encryption_key for the rationale — automated
             # rotation, no dependent redeploys, 90-day compliance baseline.

@@ -91,7 +91,7 @@ class HelloWorldAuditStack(Stack):
         self.encryption_key = kms.Key(
             self,
             "AuditEncryptionKey",
-            description=f"KMS key for {self.stack_name} CloudTrail audit logs",
+            description=f"KMS key for {self.stack_name} CloudTrail audit logs [cdk-diff smoke test]",
             enable_key_rotation=True,
             rotation_period=Duration.days(90),
             removal_policy=removal_policy,
