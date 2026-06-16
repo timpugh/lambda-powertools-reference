@@ -86,7 +86,7 @@ class BackendStack(Stack):
         CfnOutput(
             self,
             "FunctionArnOutput",
-            description="Serverless App Lambda Function ARN",
+            description="ARN of the Lambda function backing the greeting API",
             value=self.app.function.function_arn,
         )
         CfnOutput(
