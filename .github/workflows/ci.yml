@@ -117,7 +117,7 @@ jobs:
 
       - name: API breaking-change gate
         if: github.event_name == 'pull_request' && steps.base-spec.outputs.exists == 'true'
-        uses: oasdiff/oasdiff-action/breaking@5fbe96ede8d0c53aeadef122d7a0abb79152d493  # v0.1.1
+        uses: oasdiff/oasdiff-action/breaking@ae5ef6402ebe218ac6e872c59d0fa4557694e75c  # v0.1.4
         with:
           base: openapi-base.json
           revision: docs/openapi.json
