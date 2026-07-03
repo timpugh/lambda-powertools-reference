@@ -35,7 +35,7 @@ lambda = [
 # assertion tests. Conflicts with `lambda` at the `attrs` pin (CDK requires
 # attrs<26 via jsii; Powertools requires attrs>=26).
 cdk = [
-    "aws-cdk-lib==2.258.1",
+    "aws-cdk-lib==2.261.0",
     "constructs==10.6.0",
     "aws-cdk-aws-lambda-python-alpha==2.261.0a0",
     "cdk-monitoring-constructs==10.1.0",
