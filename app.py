@@ -63,8 +63,17 @@ import os
 import aws_cdk as cdk
 
 from infrastructure.app_stage import DEFAULT_ENV_NAME, AppStage, parse_context_flag, stage_id
+from infrastructure.nag_utils import attach_nag_packs
 
 app = cdk.App()
+
+# cdk-nag v3: the five rule packs are policy-validation plugins evaluated over
+# the synthesized assembly during app.synth() — attached ONCE here at the App
+# root, not per stack (per-stack Aspects carry only the project's own
+# TemplateConventionChecks; see nag_utils.attach_nag_packs). Unacknowledged
+# findings fail the synth itself, so `cdk synth` (CLI and in-process alike)
+# remains the hard gate.
+attach_nag_packs(app)
 
 # Target region for the backend and frontend stacks. Defaults to us-east-1
 # when no context value is provided. WAF is always pinned to us-east-1

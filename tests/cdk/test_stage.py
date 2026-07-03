@@ -8,43 +8,89 @@ contracts:
 1. **prod keeps the legacy names byte-for-byte** — any drift would orphan the
    currently deployed stacks (CloudFormation matches stacks by name).
 2. **Non-prod names embed the env name and disable alarm paging.**
-3. **Every stack synthesizes with zero unsuppressed cdk-nag errors.** This is
-   a near-equivalent of the CLI ``cdk synth '**'`` gate that runs without
-   Docker: ``Template.from_stack`` never *raises* on Aspect errors, but the
-   findings are present as error-level annotations, so asserting the
-   annotation list is empty catches an unsuppressed finding locally instead
-   of in the CI cdk-check job. The CLI synth remains the authoritative gate
-   (it also covers asset bundling); see CLAUDE.md.
+3. **Every shipped shape synthesizes with zero unacknowledged cdk-nag
+   findings.** cdk-nag v3 packs are policy-validation plugins evaluated over
+   the synthesized assembly; the gate here synthesizes each deployment shape
+   (fixtures attach the packs the same way ``app.py`` does) and parses the
+   assembly's ``validation-report.json`` — neither ``app.synth()`` nor the
+   CLI fails natively for Python apps (see ``_unacknowledged_findings``).
+   The project's own ``TemplateConventionChecks`` Aspect still surfaces
+   error-level annotations, asserted separately. The CLI path stays gated by
+   ``scripts/check_validation_report.py`` in ``make cdk-synth`` and CI.
 """
 
 import json
+from pathlib import Path
+from typing import cast
 
 import pytest
 
 aws_cdk = pytest.importorskip("aws_cdk", reason="aws_cdk not installed — skipping CDK stage tests")
 
 import aws_cdk as cdk
+from aws_cdk import aws_s3 as s3
 from aws_cdk.assertions import Annotations, Match, Template
 
 from infrastructure.app_stage import DEFAULT_ENV_NAME, AppStage, parse_context_flag, validate_env_name
+from infrastructure.nag_utils import attach_nag_packs
+from infrastructure.validation_aspects import TemplateConventionChecks
 
 # Skip Docker bundling so these tests run without Docker (same key the CLI honours).
 _NO_BUNDLING = {"aws:cdk:bundling-stacks": []}
 
 
+def _nag_app() -> cdk.App:
+    """A test App with the five rule packs attached, mirroring app.py."""
+    app = cdk.App(context=_NO_BUNDLING)
+    attach_nag_packs(app)
+    return app
+
+
+def _unacknowledged_findings(root: cdk.App) -> list[str]:
+    """Synthesize an App and return its unacknowledged cdk-nag v3 findings.
+
+    Policy-validation plugins evaluate the produced assembly during
+    ``App.synth()``, but the in-process synth does NOT raise on findings
+    (observed against cdk-nag 3.0.1) — it prints the report and writes
+    ``validation-report.json`` into the cloud assembly. Reading that file is
+    therefore the reliable in-process gate. The CLI synth doesn't fail for
+    Python apps either (CDK sets process.exitCode in jsii's throwaway Node
+    kernel), which is why make cdk-synth / CI run
+    scripts/check_validation_report.py over cdk.out after synthesizing.
+    """
+    assembly = root.synth()
+    report_path = Path(assembly.directory) / "validation-report.json"
+    if not report_path.exists():
+        return []
+    report = json.loads(report_path.read_text())
+    return [
+        f"{violation.get('ruleName')} @ "
+        + ", ".join(r.get("resourceLogicalId", "?") for r in violation.get("violatingResources", []))
+        for plugin_report in report.get("pluginReports", [])
+        for violation in plugin_report.get("violations", [])
+    ]
+
+
+def _assert_nag_clean(stage: AppStage) -> None:
+    findings = _unacknowledged_findings(cast(cdk.App, stage.node.root))
+    details = "\n".join(f"  {f}" for f in findings)
+    assert not findings, (
+        f"unacknowledged cdk-nag findings — fix the resource or add a scoped "
+        f"acknowledgment with a reason (see CLAUDE.md):\n{details}"
+    )
+
+
 @pytest.fixture(scope="module")
 def prod_stage() -> AppStage:
     """Synthesize the default (prod) stage for us-east-1."""
-    app = cdk.App(context=_NO_BUNDLING)
-    return AppStage(app, "ServerlessApp-us-east-1-stage", region="us-east-1")
+    return AppStage(_nag_app(), "ServerlessApp-us-east-1-stage", region="us-east-1")
 
 
 @pytest.fixture(scope="module")
 def dev_stage() -> AppStage:
     """Synthesize an ephemeral developer stage."""
-    app = cdk.App(context=_NO_BUNDLING)
     return AppStage(
-        app,
+        _nag_app(),
         "ServerlessApp-alice-feature-x-us-east-1-stage",
         region="us-east-1",
         env_name="alice-feature-x",
@@ -214,73 +260,76 @@ class TestDeploymentAggressivenessByEnv:
 
 
 class TestNagCompliance:
-    """Zero error-level annotations per stack, asserted without Docker.
+    """cdk-nag v3 gate: unacknowledged findings fail ``app.synth()`` itself.
 
-    Covers both cdk-nag rule-pack findings and the project's
-    ``TemplateConventionChecks`` validation Aspect — both surface as
-    error-level annotations through ``apply_compliance_aspects``.
+    The five rule packs are policy-validation plugins on each fixture's test
+    App (attached exactly the way ``app.py`` does), so one full-app synth per
+    deployment shape is the compliance gate for every stack in that shape.
+    The project's own ``TemplateConventionChecks`` Aspect still surfaces
+    error-level annotations and is asserted separately.
     """
 
-    @pytest.mark.parametrize("stack_attr", ["waf", "data", "backend", "frontend", "audit"])
-    def test_no_unsuppressed_nag_errors(self, prod_stage: AppStage, stack_attr: str) -> None:
-        stack = getattr(prod_stage, stack_attr)
-        errors = Annotations.from_stack(stack).find_error("*", Match.string_like_regexp(".*"))
-        details = "\n".join(
-            f"  {e.id}: {(e.entry.data if isinstance(e.entry.data, str) else str(e.entry.data)).splitlines()[0]}"
-            for e in errors
-        )
-        assert not errors, (
-            f"unsuppressed cdk-nag findings on {stack.stack_name} — fix the resource or add a "
-            f"scoped suppression with a reason (see CLAUDE.md):\n{details}"
-        )
+    def test_prod_stage_has_no_unacknowledged_findings(self, prod_stage: AppStage) -> None:
+        _assert_nag_clean(prod_stage)
 
-    def test_dev_stage_has_no_unsuppressed_nag_errors(self, dev_stage: AppStage) -> None:
+    def test_dev_stage_has_no_unacknowledged_findings(self, dev_stage: AppStage) -> None:
         # The non-prod shape (no SNS topic) must be nag-clean too — otherwise
         # ephemeral stacks would fail the CI synth gate when env is overridden.
-        errors = Annotations.from_stack(dev_stage.backend).find_error("*", Match.string_like_regexp(".*"))
-        assert not errors
+        _assert_nag_clean(dev_stage)
 
-    def test_appconfig_monitor_shape_has_no_unsuppressed_nag_errors(self) -> None:
+    def test_appconfig_monitor_shape_has_no_unacknowledged_findings(self) -> None:
         # The opt-in monitor shape adds an alarm + a cloudwatch:DescribeAlarms
-        # role; its suppressions (IAM5 wildcard, inline-policy, no-alarm-action)
-        # must be complete or a fork enabling appconfig_monitor would fail synth.
-        app = cdk.App(context=_NO_BUNDLING)
-        stage = AppStage(app, "ServerlessApp-us-east-1-stage", region="us-east-1", appconfig_monitor=True)
-        errors = Annotations.from_stack(stage.backend).find_error("*", Match.string_like_regexp(".*"))
-        assert not errors
+        # role; its acknowledgments (IAM5 wildcard, inline-policy,
+        # no-alarm-action) must be complete or a fork enabling
+        # appconfig_monitor would fail synth.
+        stage = AppStage(_nag_app(), "ServerlessApp-us-east-1-stage", region="us-east-1", appconfig_monitor=True)
+        _assert_nag_clean(stage)
 
-    def test_retain_data_shape_has_no_unsuppressed_nag_errors(self) -> None:
+    def test_retain_data_shape_has_no_unacknowledged_findings(self) -> None:
         # The production-fork shape (retain_data=True: RETAIN + deletion/
         # termination protection, retained buckets with no auto-delete
         # provider) is never synthesized by the CI CLI gate (default context) —
         # this is its only nag gate. A finding unique to the retained shape
         # would otherwise surface for the first time on a production fork's
         # own synth, after they flip the one switch the template tells them to.
-        app = cdk.App(context=_NO_BUNDLING)
-        stage = AppStage(app, "ServerlessApp-us-east-1-stage", region="us-east-1", retain_data=True)
-        for stack in (stage.data, stage.audit):
-            errors = Annotations.from_stack(stack).find_error("*", Match.string_like_regexp(".*"))
-            assert not errors, f"unsuppressed cdk-nag findings on the retained shape of {stack.stack_name}"
+        stage = AppStage(_nag_app(), "ServerlessApp-us-east-1-stage", region="us-east-1", retain_data=True)
+        _assert_nag_clean(stage)
+
+    def test_nag_gate_can_fail(self) -> None:
+        # The assertion that the gate is not vacuous: a deliberately
+        # non-compliant resource must produce findings in the validation
+        # report. If the packs stop attaching (or the report location/shape
+        # changes), every clean-gate test above would pass on nothing — this
+        # canary is what catches that. A bare default Bucket violates several
+        # pack rules (no access logs, no SSL, no KMS default encryption).
+        app = _nag_app()
+        stack = cdk.Stack(app, "NagCanaryStack")
+        s3.Bucket(stack, "NonCompliantBucket")
+        findings = _unacknowledged_findings(app)
+        assert findings, "the nag gate reported nothing for a non-compliant bucket — the gate is vacuous"
+        assert any("AwsSolutions-S" in f or "S3Bucket" in f for f in findings), findings
 
     @pytest.mark.parametrize("stack_attr", ["waf", "data", "backend", "frontend", "audit"])
-    def test_compliance_aspects_attached_to_every_stack(self, prod_stage: AppStage, stack_attr: str) -> None:
-        # The whole nag gate hangs on each stack constructor calling
-        # apply_compliance_aspects. If a refactor drops that call from one
-        # stack, every other gate passes VACUOUSLY: zero annotations here, a
-        # clean CLI synth, and unchanged snapshots (NagSuppressions write
-        # resource metadata whether or not the packs run). This is the
-        # assertion that the gate can actually fail — the five rule packs and
-        # the project's own validation Aspect must be attached to every stack.
-        aspect_names = {type(aspect).__name__ for aspect in cdk.Aspects.of(getattr(prod_stage, stack_attr)).all}
-        for expected in (
-            "AwsSolutionsChecks",
-            "ServerlessChecks",
-            "NIST80053R5Checks",
-            "HIPAASecurityChecks",
-            "PCIDSS321Checks",
-            "TemplateConventionChecks",
-        ):
-            assert expected in aspect_names, (
-                f"{expected} is not attached to the {stack_attr} stack — apply_compliance_aspects "
-                "was likely dropped from its constructor, which silently disables the nag gate there"
-            )
+    def test_convention_checks_have_no_error_annotations(self, prod_stage: AppStage, stack_attr: str) -> None:
+        # TemplateConventionChecks (the project's own Aspect) still reports
+        # via error-level annotations, independent of the v3 plugin packs.
+        stack = getattr(prod_stage, stack_attr)
+        errors = Annotations.from_stack(stack).find_error("*", Match.string_like_regexp(".*"))
+        details = "\n".join(
+            f"  {e.id}: {(e.entry.data if isinstance(e.entry.data, str) else str(e.entry.data)).splitlines()[0]}"
+            for e in errors
+        )
+        assert not errors, f"error annotations on {stack.stack_name} (TemplateConventionChecks?):\n{details}"
+
+    @pytest.mark.parametrize("stack_attr", ["waf", "data", "backend", "frontend", "audit"])
+    def test_convention_aspect_attached_to_every_stack(self, prod_stage: AppStage, stack_attr: str) -> None:
+        # The convention gate hangs on each stack constructor calling
+        # apply_compliance_aspects; dropping the call would pass every other
+        # gate vacuously. (The five rule packs are covered by
+        # test_nag_gate_can_fail — they are App-level plugins now, not
+        # per-stack Aspects.)
+        aspects = cdk.Aspects.of(getattr(prod_stage, stack_attr)).all
+        assert any(isinstance(aspect, TemplateConventionChecks) for aspect in aspects), (
+            f"TemplateConventionChecks is not attached to the {stack_attr} stack — "
+            "apply_compliance_aspects was likely dropped from its constructor"
+        )

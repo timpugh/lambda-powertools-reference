@@ -1,25 +1,4 @@
 {
-  "Metadata": {
-    "cdk_nag": {
-      "rules_to_suppress": [
-        {
-          "id": "NIST.800.53.R5-IAMNoInlinePolicy",
-          "is_reason_encoded": true,
-          "reason": "Q0RLJ3MgQ3Jvc3NSZWdpb25FeHBvcnRXcml0ZXIgY3VzdG9tIHJlc291cmNlIChjcmVhdGVkIGxhemlseSBieSBjcm9zc19yZWdpb25fcmVmZXJlbmNlcyBhZnRlciBzdGFjayBjb25zdHJ1Y3Rpb24pIHVzZXMgYSBDREstZ2VuZXJhdGVkIGlubGluZSBwb2xpY3kgb24gaXRzIHByb3ZpZGVyIHJvbGUg4oCUIG5vdCBkaXJlY3RseSBjb25maWd1cmFibGU="
-        },
-        {
-          "id": "HIPAA.Security-IAMNoInlinePolicy",
-          "is_reason_encoded": true,
-          "reason": "Q0RLJ3MgQ3Jvc3NSZWdpb25FeHBvcnRXcml0ZXIgY3VzdG9tIHJlc291cmNlIChjcmVhdGVkIGxhemlseSBieSBjcm9zc19yZWdpb25fcmVmZXJlbmNlcyBhZnRlciBzdGFjayBjb25zdHJ1Y3Rpb24pIHVzZXMgYSBDREstZ2VuZXJhdGVkIGlubGluZSBwb2xpY3kgb24gaXRzIHByb3ZpZGVyIHJvbGUg4oCUIG5vdCBkaXJlY3RseSBjb25maWd1cmFibGU="
-        },
-        {
-          "id": "PCI.DSS.321-IAMNoInlinePolicy",
-          "is_reason_encoded": true,
-          "reason": "Q0RLJ3MgQ3Jvc3NSZWdpb25FeHBvcnRXcml0ZXIgY3VzdG9tIHJlc291cmNlIChjcmVhdGVkIGxhemlseSBieSBjcm9zc19yZWdpb25fcmVmZXJlbmNlcyBhZnRlciBzdGFjayBjb25zdHJ1Y3Rpb24pIHVzZXMgYSBDREstZ2VuZXJhdGVkIGlubGluZSBwb2xpY3kgb24gaXRzIHByb3ZpZGVyIHJvbGUg4oCUIG5vdCBkaXJlY3RseSBjb25maWd1cmFibGU="
-        }
-      ]
-    }
-  },
   "Outputs": {
     "ExportsOutputFnGetAttWebACLArn3404FD8D": {
       "Export": {
@@ -67,6 +46,24 @@
   "Resources": {
     "AutoDeleteObjectsLogGroupC1303B18": {
       "DeletionPolicy": "Delete",
+      "Metadata": {
+        "cdk_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "NIST.800.53.R5-IAMNoInlinePolicy",
+              "reason": "CDK's CrossRegionExportWriter custom resource (created lazily by cross_region_references after stack construction) uses a CDK-generated inline policy on its provider role \u2014 not directly configurable"
+            },
+            {
+              "id": "HIPAA.Security-IAMNoInlinePolicy",
+              "reason": "CDK's CrossRegionExportWriter custom resource (created lazily by cross_region_references after stack construction) uses a CDK-generated inline policy on its provider role \u2014 not directly configurable"
+            },
+            {
+              "id": "PCI.DSS.321-IAMNoInlinePolicy",
+              "reason": "CDK's CrossRegionExportWriter custom resource (created lazily by cross_region_references after stack construction) uses a CDK-generated inline policy on its provider role \u2014 not directly configurable"
+            }
+          ]
+        }
+      },
       "Properties": {
         "KmsKeyId": {
           "Fn::GetAtt": [
@@ -111,31 +108,20 @@
         "cdk_nag": {
           "rules_to_suppress": [
             {
-              "id": "AwsSolutions-IAM4",
-              "reason": "CDK-managed singleton Lambda uses AWS managed execution role"
-            },
-            {
-              "id": "AwsSolutions-IAM5",
-              "reason": "CDK-managed singleton Lambda uses wildcard in auto-generated policy"
-            },
-            {
               "id": "AwsSolutions-L1",
               "reason": "CDK-managed singleton Lambda runtime is not configurable"
             },
             {
               "id": "Serverless-LambdaTracing",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgdHJhY2luZyBpcyBub3QgY29uZmlndXJhYmxl"
+              "reason": "CDK-managed singleton Lambda \u2014 tracing is not configurable"
             },
             {
               "id": "Serverless-LambdaDLQ",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgRExRIGlzIG5vdCBjb25maWd1cmFibGU="
+              "reason": "CDK-managed singleton Lambda \u2014 DLQ is not configurable"
             },
             {
               "id": "Serverless-LambdaDefaultMemorySize",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgbWVtb3J5IGlzIG5vdCBjb25maWd1cmFibGU="
+              "reason": "CDK-managed singleton Lambda \u2014 memory is not configurable"
             },
             {
               "id": "Serverless-LambdaLatestVersion",
@@ -147,18 +133,15 @@
             },
             {
               "id": "NIST.800.53.R5-LambdaDLQ",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgRExRIGlzIG5vdCBjb25maWd1cmFibGU="
+              "reason": "CDK-managed singleton Lambda \u2014 DLQ is not configurable"
             },
             {
               "id": "NIST.800.53.R5-LambdaConcurrency",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgY29uY3VycmVuY3kgaXMgbm90IGNvbmZpZ3VyYWJsZQ=="
+              "reason": "CDK-managed singleton Lambda \u2014 concurrency is not configurable"
             },
             {
               "id": "NIST.800.53.R5-LambdaInsideVPC",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgVlBDIGlzIG5vdCBjb25maWd1cmFibGU="
+              "reason": "CDK-managed singleton Lambda \u2014 VPC is not configurable"
             },
             {
               "id": "HIPAA.Security-IAMNoInlinePolicy",
@@ -166,18 +149,15 @@
             },
             {
               "id": "HIPAA.Security-LambdaDLQ",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgRExRIGlzIG5vdCBjb25maWd1cmFibGU="
+              "reason": "CDK-managed singleton Lambda \u2014 DLQ is not configurable"
             },
             {
               "id": "HIPAA.Security-LambdaConcurrency",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgY29uY3VycmVuY3kgaXMgbm90IGNvbmZpZ3VyYWJsZQ=="
+              "reason": "CDK-managed singleton Lambda \u2014 concurrency is not configurable"
             },
             {
               "id": "HIPAA.Security-LambdaInsideVPC",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgVlBDIGlzIG5vdCBjb25maWd1cmFibGU="
+              "reason": "CDK-managed singleton Lambda \u2014 VPC is not configurable"
             },
             {
               "id": "PCI.DSS.321-IAMNoInlinePolicy",
@@ -185,8 +165,11 @@
             },
             {
               "id": "PCI.DSS.321-LambdaInsideVPC",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgVlBDIGlzIG5vdCBjb25maWd1cmFibGU="
+              "reason": "CDK-managed singleton Lambda \u2014 VPC is not configurable"
+            },
+            {
+              "id": "AwsSolutions-IAM4[Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole]",
+              "reason": "CDK-managed singleton Lambda uses AWS managed execution role"
             }
           ]
         }
@@ -228,31 +211,20 @@
         "cdk_nag": {
           "rules_to_suppress": [
             {
-              "id": "AwsSolutions-IAM4",
-              "reason": "CDK-managed singleton Lambda uses AWS managed execution role"
-            },
-            {
-              "id": "AwsSolutions-IAM5",
-              "reason": "CDK-managed singleton Lambda uses wildcard in auto-generated policy"
-            },
-            {
               "id": "AwsSolutions-L1",
               "reason": "CDK-managed singleton Lambda runtime is not configurable"
             },
             {
               "id": "Serverless-LambdaTracing",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgdHJhY2luZyBpcyBub3QgY29uZmlndXJhYmxl"
+              "reason": "CDK-managed singleton Lambda \u2014 tracing is not configurable"
             },
             {
               "id": "Serverless-LambdaDLQ",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgRExRIGlzIG5vdCBjb25maWd1cmFibGU="
+              "reason": "CDK-managed singleton Lambda \u2014 DLQ is not configurable"
             },
             {
               "id": "Serverless-LambdaDefaultMemorySize",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgbWVtb3J5IGlzIG5vdCBjb25maWd1cmFibGU="
+              "reason": "CDK-managed singleton Lambda \u2014 memory is not configurable"
             },
             {
               "id": "Serverless-LambdaLatestVersion",
@@ -264,18 +236,15 @@
             },
             {
               "id": "NIST.800.53.R5-LambdaDLQ",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgRExRIGlzIG5vdCBjb25maWd1cmFibGU="
+              "reason": "CDK-managed singleton Lambda \u2014 DLQ is not configurable"
             },
             {
               "id": "NIST.800.53.R5-LambdaConcurrency",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgY29uY3VycmVuY3kgaXMgbm90IGNvbmZpZ3VyYWJsZQ=="
+              "reason": "CDK-managed singleton Lambda \u2014 concurrency is not configurable"
             },
             {
               "id": "NIST.800.53.R5-LambdaInsideVPC",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgVlBDIGlzIG5vdCBjb25maWd1cmFibGU="
+              "reason": "CDK-managed singleton Lambda \u2014 VPC is not configurable"
             },
             {
               "id": "HIPAA.Security-IAMNoInlinePolicy",
@@ -283,18 +252,15 @@
             },
             {
               "id": "HIPAA.Security-LambdaDLQ",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgRExRIGlzIG5vdCBjb25maWd1cmFibGU="
+              "reason": "CDK-managed singleton Lambda \u2014 DLQ is not configurable"
             },
             {
               "id": "HIPAA.Security-LambdaConcurrency",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgY29uY3VycmVuY3kgaXMgbm90IGNvbmZpZ3VyYWJsZQ=="
+              "reason": "CDK-managed singleton Lambda \u2014 concurrency is not configurable"
             },
             {
               "id": "HIPAA.Security-LambdaInsideVPC",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgVlBDIGlzIG5vdCBjb25maWd1cmFibGU="
+              "reason": "CDK-managed singleton Lambda \u2014 VPC is not configurable"
             },
             {
               "id": "PCI.DSS.321-IAMNoInlinePolicy",
@@ -302,8 +268,11 @@
             },
             {
               "id": "PCI.DSS.321-LambdaInsideVPC",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgVlBDIGlzIG5vdCBjb25maWd1cmFibGU="
+              "reason": "CDK-managed singleton Lambda \u2014 VPC is not configurable"
+            },
+            {
+              "id": "AwsSolutions-IAM4[Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole]",
+              "reason": "CDK-managed singleton Lambda uses AWS managed execution role"
             }
           ]
         }
@@ -333,6 +302,24 @@
       "DependsOn": [
         "WafLogsBucketPolicyC1654A35"
       ],
+      "Metadata": {
+        "cdk_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "NIST.800.53.R5-IAMNoInlinePolicy",
+              "reason": "CDK's CrossRegionExportWriter custom resource (created lazily by cross_region_references after stack construction) uses a CDK-generated inline policy on its provider role \u2014 not directly configurable"
+            },
+            {
+              "id": "HIPAA.Security-IAMNoInlinePolicy",
+              "reason": "CDK's CrossRegionExportWriter custom resource (created lazily by cross_region_references after stack construction) uses a CDK-generated inline policy on its provider role \u2014 not directly configurable"
+            },
+            {
+              "id": "PCI.DSS.321-IAMNoInlinePolicy",
+              "reason": "CDK's CrossRegionExportWriter custom resource (created lazily by cross_region_references after stack construction) uses a CDK-generated inline policy on its provider role \u2014 not directly configurable"
+            }
+          ]
+        }
+      },
       "Properties": {
         "LogDestinationConfigs": [
           {
@@ -353,6 +340,24 @@
     },
     "WafEncryptionKeyB025E51A": {
       "DeletionPolicy": "Delete",
+      "Metadata": {
+        "cdk_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "NIST.800.53.R5-IAMNoInlinePolicy",
+              "reason": "CDK's CrossRegionExportWriter custom resource (created lazily by cross_region_references after stack construction) uses a CDK-generated inline policy on its provider role \u2014 not directly configurable"
+            },
+            {
+              "id": "HIPAA.Security-IAMNoInlinePolicy",
+              "reason": "CDK's CrossRegionExportWriter custom resource (created lazily by cross_region_references after stack construction) uses a CDK-generated inline policy on its provider role \u2014 not directly configurable"
+            },
+            {
+              "id": "PCI.DSS.321-IAMNoInlinePolicy",
+              "reason": "CDK's CrossRegionExportWriter custom resource (created lazily by cross_region_references after stack construction) uses a CDK-generated inline policy on its provider role \u2014 not directly configurable"
+            }
+          ]
+        }
+      },
       "Properties": {
         "Description": "KMS key for ServerlessAppWaf-us-east-1 provider log group encryption",
         "EnableKeyRotation": true,
@@ -430,68 +435,67 @@
           "rules_to_suppress": [
             {
               "id": "AwsSolutions-S1",
-              "is_reason_encoded": true,
-              "reason": "V0FGIGxvZyBkZXN0aW5hdGlvbiBidWNrZXQg4oCUIFNTRS1TMyAoZGVsaXZlcnkgZG9lc24ndCBzdXBwb3J0IEtNUy1DTUsgYnVja2V0cyksIG5vIHNlbGYtbG9nZ2luZy92ZXJzaW9uaW5nL3JlcGxpY2F0aW9uIGZvciBhbiBhcHBlbmQtb25seSBsb2cgc2luaw=="
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
             },
             {
               "id": "NIST.800.53.R5-S3BucketLoggingEnabled",
-              "is_reason_encoded": true,
-              "reason": "V0FGIGxvZyBkZXN0aW5hdGlvbiBidWNrZXQg4oCUIFNTRS1TMyAoZGVsaXZlcnkgZG9lc24ndCBzdXBwb3J0IEtNUy1DTUsgYnVja2V0cyksIG5vIHNlbGYtbG9nZ2luZy92ZXJzaW9uaW5nL3JlcGxpY2F0aW9uIGZvciBhbiBhcHBlbmQtb25seSBsb2cgc2luaw=="
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
             },
             {
               "id": "HIPAA.Security-S3BucketLoggingEnabled",
-              "is_reason_encoded": true,
-              "reason": "V0FGIGxvZyBkZXN0aW5hdGlvbiBidWNrZXQg4oCUIFNTRS1TMyAoZGVsaXZlcnkgZG9lc24ndCBzdXBwb3J0IEtNUy1DTUsgYnVja2V0cyksIG5vIHNlbGYtbG9nZ2luZy92ZXJzaW9uaW5nL3JlcGxpY2F0aW9uIGZvciBhbiBhcHBlbmQtb25seSBsb2cgc2luaw=="
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
             },
             {
               "id": "PCI.DSS.321-S3BucketLoggingEnabled",
-              "is_reason_encoded": true,
-              "reason": "V0FGIGxvZyBkZXN0aW5hdGlvbiBidWNrZXQg4oCUIFNTRS1TMyAoZGVsaXZlcnkgZG9lc24ndCBzdXBwb3J0IEtNUy1DTUsgYnVja2V0cyksIG5vIHNlbGYtbG9nZ2luZy92ZXJzaW9uaW5nL3JlcGxpY2F0aW9uIGZvciBhbiBhcHBlbmQtb25seSBsb2cgc2luaw=="
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
             },
             {
               "id": "NIST.800.53.R5-S3DefaultEncryptionKMS",
-              "is_reason_encoded": true,
-              "reason": "V0FGIGxvZyBkZXN0aW5hdGlvbiBidWNrZXQg4oCUIFNTRS1TMyAoZGVsaXZlcnkgZG9lc24ndCBzdXBwb3J0IEtNUy1DTUsgYnVja2V0cyksIG5vIHNlbGYtbG9nZ2luZy92ZXJzaW9uaW5nL3JlcGxpY2F0aW9uIGZvciBhbiBhcHBlbmQtb25seSBsb2cgc2luaw=="
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
             },
             {
               "id": "HIPAA.Security-S3DefaultEncryptionKMS",
-              "is_reason_encoded": true,
-              "reason": "V0FGIGxvZyBkZXN0aW5hdGlvbiBidWNrZXQg4oCUIFNTRS1TMyAoZGVsaXZlcnkgZG9lc24ndCBzdXBwb3J0IEtNUy1DTUsgYnVja2V0cyksIG5vIHNlbGYtbG9nZ2luZy92ZXJzaW9uaW5nL3JlcGxpY2F0aW9uIGZvciBhbiBhcHBlbmQtb25seSBsb2cgc2luaw=="
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
             },
             {
               "id": "PCI.DSS.321-S3DefaultEncryptionKMS",
-              "is_reason_encoded": true,
-              "reason": "V0FGIGxvZyBkZXN0aW5hdGlvbiBidWNrZXQg4oCUIFNTRS1TMyAoZGVsaXZlcnkgZG9lc24ndCBzdXBwb3J0IEtNUy1DTUsgYnVja2V0cyksIG5vIHNlbGYtbG9nZ2luZy92ZXJzaW9uaW5nL3JlcGxpY2F0aW9uIGZvciBhbiBhcHBlbmQtb25seSBsb2cgc2luaw=="
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
             },
             {
               "id": "NIST.800.53.R5-S3BucketVersioningEnabled",
-              "is_reason_encoded": true,
-              "reason": "V0FGIGxvZyBkZXN0aW5hdGlvbiBidWNrZXQg4oCUIFNTRS1TMyAoZGVsaXZlcnkgZG9lc24ndCBzdXBwb3J0IEtNUy1DTUsgYnVja2V0cyksIG5vIHNlbGYtbG9nZ2luZy92ZXJzaW9uaW5nL3JlcGxpY2F0aW9uIGZvciBhbiBhcHBlbmQtb25seSBsb2cgc2luaw=="
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
             },
             {
               "id": "HIPAA.Security-S3BucketVersioningEnabled",
-              "is_reason_encoded": true,
-              "reason": "V0FGIGxvZyBkZXN0aW5hdGlvbiBidWNrZXQg4oCUIFNTRS1TMyAoZGVsaXZlcnkgZG9lc24ndCBzdXBwb3J0IEtNUy1DTUsgYnVja2V0cyksIG5vIHNlbGYtbG9nZ2luZy92ZXJzaW9uaW5nL3JlcGxpY2F0aW9uIGZvciBhbiBhcHBlbmQtb25seSBsb2cgc2luaw=="
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
             },
             {
               "id": "PCI.DSS.321-S3BucketVersioningEnabled",
-              "is_reason_encoded": true,
-              "reason": "V0FGIGxvZyBkZXN0aW5hdGlvbiBidWNrZXQg4oCUIFNTRS1TMyAoZGVsaXZlcnkgZG9lc24ndCBzdXBwb3J0IEtNUy1DTUsgYnVja2V0cyksIG5vIHNlbGYtbG9nZ2luZy92ZXJzaW9uaW5nL3JlcGxpY2F0aW9uIGZvciBhbiBhcHBlbmQtb25seSBsb2cgc2luaw=="
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
             },
             {
               "id": "NIST.800.53.R5-S3BucketReplicationEnabled",
-              "is_reason_encoded": true,
-              "reason": "V0FGIGxvZyBkZXN0aW5hdGlvbiBidWNrZXQg4oCUIFNTRS1TMyAoZGVsaXZlcnkgZG9lc24ndCBzdXBwb3J0IEtNUy1DTUsgYnVja2V0cyksIG5vIHNlbGYtbG9nZ2luZy92ZXJzaW9uaW5nL3JlcGxpY2F0aW9uIGZvciBhbiBhcHBlbmQtb25seSBsb2cgc2luaw=="
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
             },
             {
               "id": "HIPAA.Security-S3BucketReplicationEnabled",
-              "is_reason_encoded": true,
-              "reason": "V0FGIGxvZyBkZXN0aW5hdGlvbiBidWNrZXQg4oCUIFNTRS1TMyAoZGVsaXZlcnkgZG9lc24ndCBzdXBwb3J0IEtNUy1DTUsgYnVja2V0cyksIG5vIHNlbGYtbG9nZ2luZy92ZXJzaW9uaW5nL3JlcGxpY2F0aW9uIGZvciBhbiBhcHBlbmQtb25seSBsb2cgc2luaw=="
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
             },
             {
               "id": "PCI.DSS.321-S3BucketReplicationEnabled",
-              "is_reason_encoded": true,
-              "reason": "V0FGIGxvZyBkZXN0aW5hdGlvbiBidWNrZXQg4oCUIFNTRS1TMyAoZGVsaXZlcnkgZG9lc24ndCBzdXBwb3J0IEtNUy1DTUsgYnVja2V0cyksIG5vIHNlbGYtbG9nZ2luZy92ZXJzaW9uaW5nL3JlcGxpY2F0aW9uIGZvciBhbiBhcHBlbmQtb25seSBsb2cgc2luaw=="
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
+            },
+            {
+              "id": "NIST.800.53.R5-IAMNoInlinePolicy",
+              "reason": "CDK's CrossRegionExportWriter custom resource (created lazily by cross_region_references after stack construction) uses a CDK-generated inline policy on its provider role \u2014 not directly configurable"
+            },
+            {
+              "id": "HIPAA.Security-IAMNoInlinePolicy",
+              "reason": "CDK's CrossRegionExportWriter custom resource (created lazily by cross_region_references after stack construction) uses a CDK-generated inline policy on its provider role \u2014 not directly configurable"
+            },
+            {
+              "id": "PCI.DSS.321-IAMNoInlinePolicy",
+              "reason": "CDK's CrossRegionExportWriter custom resource (created lazily by cross_region_references after stack construction) uses a CDK-generated inline policy on its provider role \u2014 not directly configurable"
             }
           ]
         }
@@ -559,6 +563,76 @@
         "AutoDeleteObjectsLogGroupC1303B18",
         "WafLogsBucketPolicyC1654A35"
       ],
+      "Metadata": {
+        "cdk_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "AwsSolutions-S1",
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
+            },
+            {
+              "id": "NIST.800.53.R5-S3BucketLoggingEnabled",
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
+            },
+            {
+              "id": "HIPAA.Security-S3BucketLoggingEnabled",
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
+            },
+            {
+              "id": "PCI.DSS.321-S3BucketLoggingEnabled",
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
+            },
+            {
+              "id": "NIST.800.53.R5-S3DefaultEncryptionKMS",
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
+            },
+            {
+              "id": "HIPAA.Security-S3DefaultEncryptionKMS",
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
+            },
+            {
+              "id": "PCI.DSS.321-S3DefaultEncryptionKMS",
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
+            },
+            {
+              "id": "NIST.800.53.R5-S3BucketVersioningEnabled",
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
+            },
+            {
+              "id": "HIPAA.Security-S3BucketVersioningEnabled",
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
+            },
+            {
+              "id": "PCI.DSS.321-S3BucketVersioningEnabled",
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
+            },
+            {
+              "id": "NIST.800.53.R5-S3BucketReplicationEnabled",
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
+            },
+            {
+              "id": "HIPAA.Security-S3BucketReplicationEnabled",
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
+            },
+            {
+              "id": "PCI.DSS.321-S3BucketReplicationEnabled",
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
+            },
+            {
+              "id": "NIST.800.53.R5-IAMNoInlinePolicy",
+              "reason": "CDK's CrossRegionExportWriter custom resource (created lazily by cross_region_references after stack construction) uses a CDK-generated inline policy on its provider role \u2014 not directly configurable"
+            },
+            {
+              "id": "HIPAA.Security-IAMNoInlinePolicy",
+              "reason": "CDK's CrossRegionExportWriter custom resource (created lazily by cross_region_references after stack construction) uses a CDK-generated inline policy on its provider role \u2014 not directly configurable"
+            },
+            {
+              "id": "PCI.DSS.321-IAMNoInlinePolicy",
+              "reason": "CDK's CrossRegionExportWriter custom resource (created lazily by cross_region_references after stack construction) uses a CDK-generated inline policy on its provider role \u2014 not directly configurable"
+            }
+          ]
+        }
+      },
       "Properties": {
         "BucketName": {
           "Ref": "WafLogsBucket2E62CA90"
@@ -574,6 +648,76 @@
       "UpdateReplacePolicy": "Delete"
     },
     "WafLogsBucketPolicyC1654A35": {
+      "Metadata": {
+        "cdk_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "AwsSolutions-S1",
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
+            },
+            {
+              "id": "NIST.800.53.R5-S3BucketLoggingEnabled",
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
+            },
+            {
+              "id": "HIPAA.Security-S3BucketLoggingEnabled",
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
+            },
+            {
+              "id": "PCI.DSS.321-S3BucketLoggingEnabled",
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
+            },
+            {
+              "id": "NIST.800.53.R5-S3DefaultEncryptionKMS",
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
+            },
+            {
+              "id": "HIPAA.Security-S3DefaultEncryptionKMS",
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
+            },
+            {
+              "id": "PCI.DSS.321-S3DefaultEncryptionKMS",
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
+            },
+            {
+              "id": "NIST.800.53.R5-S3BucketVersioningEnabled",
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
+            },
+            {
+              "id": "HIPAA.Security-S3BucketVersioningEnabled",
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
+            },
+            {
+              "id": "PCI.DSS.321-S3BucketVersioningEnabled",
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
+            },
+            {
+              "id": "NIST.800.53.R5-S3BucketReplicationEnabled",
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
+            },
+            {
+              "id": "HIPAA.Security-S3BucketReplicationEnabled",
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
+            },
+            {
+              "id": "PCI.DSS.321-S3BucketReplicationEnabled",
+              "reason": "WAF log destination bucket \u2014 SSE-S3 (delivery doesn't support KMS-CMK buckets), no self-logging/versioning/replication for an append-only log sink"
+            },
+            {
+              "id": "NIST.800.53.R5-IAMNoInlinePolicy",
+              "reason": "CDK's CrossRegionExportWriter custom resource (created lazily by cross_region_references after stack construction) uses a CDK-generated inline policy on its provider role \u2014 not directly configurable"
+            },
+            {
+              "id": "HIPAA.Security-IAMNoInlinePolicy",
+              "reason": "CDK's CrossRegionExportWriter custom resource (created lazily by cross_region_references after stack construction) uses a CDK-generated inline policy on its provider role \u2014 not directly configurable"
+            },
+            {
+              "id": "PCI.DSS.321-IAMNoInlinePolicy",
+              "reason": "CDK's CrossRegionExportWriter custom resource (created lazily by cross_region_references after stack construction) uses a CDK-generated inline policy on its provider role \u2014 not directly configurable"
+            }
+          ]
+        }
+      },
       "Properties": {
         "Bucket": {
           "Ref": "WafLogsBucket2E62CA90"
@@ -754,6 +898,24 @@
       "Type": "AWS::S3::BucketPolicy"
     },
     "WebACL": {
+      "Metadata": {
+        "cdk_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "NIST.800.53.R5-IAMNoInlinePolicy",
+              "reason": "CDK's CrossRegionExportWriter custom resource (created lazily by cross_region_references after stack construction) uses a CDK-generated inline policy on its provider role \u2014 not directly configurable"
+            },
+            {
+              "id": "HIPAA.Security-IAMNoInlinePolicy",
+              "reason": "CDK's CrossRegionExportWriter custom resource (created lazily by cross_region_references after stack construction) uses a CDK-generated inline policy on its provider role \u2014 not directly configurable"
+            },
+            {
+              "id": "PCI.DSS.321-IAMNoInlinePolicy",
+              "reason": "CDK's CrossRegionExportWriter custom resource (created lazily by cross_region_references after stack construction) uses a CDK-generated inline policy on its provider role \u2014 not directly configurable"
+            }
+          ]
+        }
+      },
       "Properties": {
         "DefaultAction": {
           "Allow": {}

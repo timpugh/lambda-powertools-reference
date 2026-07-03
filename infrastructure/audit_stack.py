@@ -34,10 +34,10 @@ from aws_cdk import aws_iam as iam
 from aws_cdk import aws_kms as kms
 from aws_cdk import aws_logs as logs
 from aws_cdk import aws_s3 as s3
-from cdk_nag import NagSuppressions
 from constructs import Construct
 
 from infrastructure.nag_utils import (
+    acknowledge_rules,
     apply_compliance_aspects,
     create_auto_delete_objects_log_group,
     create_sse_s3_log_bucket,
@@ -199,14 +199,13 @@ class AuditStack(Stack):
             include_management_events=False,
         )
         inline_policy_reason = "CDK generates the trail's LogsRole default policy inline — not directly configurable"
-        NagSuppressions.add_resource_suppressions(
+        acknowledge_rules(
             s3_data_events_trail,
             [
                 {"id": "NIST.800.53.R5-IAMNoInlinePolicy", "reason": inline_policy_reason},
                 {"id": "HIPAA.Security-IAMNoInlinePolicy", "reason": inline_policy_reason},
                 {"id": "PCI.DSS.321-IAMNoInlinePolicy", "reason": inline_policy_reason},
             ],
-            apply_to_children=True,
         )
 
         # The destroy-friendly bucket uses auto_delete_objects, which synthesizes

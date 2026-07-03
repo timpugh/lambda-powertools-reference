@@ -165,16 +165,24 @@ jobs:
 
       # The '**' glob is required to descend into Stage-nested stacks. Without
       # it, `cdk synth` only synthesizes the top-level App (which contains the
-      # Stage but no stacks directly), so cdk-nag never runs against the actual
-      # WAF/backend/frontend stacks and any unsuppressed findings silently pass
-      # CI. `make cdk-synth` already uses the same glob — this aligns the
-      # CI gate with what runs locally.
+      # Stage but no stacks directly), so asset bundling never runs against the
+      # actual WAF/backend/frontend stacks. `make cdk-synth` uses the same glob
+      # — this aligns the CI gate with what runs locally.
       - name: Run cdk synth
         env:
           CDK_DEFAULT_ACCOUNT: "123456789012"
           CDK_DEFAULT_REGION: us-east-1
           AWS_DEFAULT_REGION: us-east-1
         run: npx cdk synth '**' --quiet
+
+      # cdk-nag v3 hard gate: CDK signals a failed policy validation by setting
+      # process.exitCode in the NODE process — for a Python app that's jsii's
+      # throwaway kernel, so the synth above exits 0 even with findings
+      # (verified live). The checker fails on any violation AND on a missing
+      # report (packs not attached = broken gate, not a pass); see
+      # scripts/check_validation_report.py.
+      - name: Check cdk-nag validation report
+        run: uv run python scripts/check_validation_report.py cdk.out
 
       - name: Run CDK stack assertion tests
         env:

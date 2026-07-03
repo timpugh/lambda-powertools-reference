@@ -12,10 +12,10 @@ from aws_cdk import (
 from aws_cdk import (
     aws_wafv2 as wafv2,
 )
-from cdk_nag import NagSuppressions
 from constructs import Construct
 
 from infrastructure.nag_utils import (
+    acknowledge_rules,
     apply_compliance_aspects,
     build_managed_threat_rules,
     create_auto_delete_objects_log_group,
@@ -162,7 +162,7 @@ class WafStack(Stack):
             "cross_region_references after stack construction) uses a CDK-generated "
             "inline policy on its provider role — not directly configurable"
         )
-        NagSuppressions.add_stack_suppressions(
+        acknowledge_rules(
             self,
             [
                 {"id": "NIST.800.53.R5-IAMNoInlinePolicy", "reason": cross_region_writer_reason},

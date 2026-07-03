@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 
 from aws_cdk import (
     CfnOutput,
@@ -43,12 +43,12 @@ from aws_cdk import (
 from aws_cdk import (
     custom_resources as cr,
 )
-from cdk_nag import NagSuppressions
 from constructs import Construct
 
 from infrastructure.nag_utils import (
     AWS_CUSTOM_RESOURCE_PROVIDER_ID,
     BUCKET_DEPLOYMENT_PROVIDER_ID,
+    acknowledge_rules,
     apply_compliance_aspects,
     attach_async_failure_destination,
     create_auto_delete_objects_log_group,
@@ -549,14 +549,13 @@ class FrontendStack(Stack):
             "cloudfront:CreateInvalidation on this stack's distribution ARN — managed-policy "
             "reuse adds nothing"
         )
-        NagSuppressions.add_resource_suppressions(
+        acknowledge_rules(
             invalidate_cf_cache,
             [
                 {"id": "NIST.800.53.R5-IAMNoInlinePolicy", "reason": cf_invalidation_inline_reason},
                 {"id": "HIPAA.Security-IAMNoInlinePolicy", "reason": cf_invalidation_inline_reason},
                 {"id": "PCI.DSS.321-IAMNoInlinePolicy", "reason": cf_invalidation_inline_reason},
             ],
-            apply_to_children=True,
         )
 
         CfnOutput(
@@ -594,7 +593,7 @@ class FrontendStack(Stack):
         # Unauthenticated identities are intentional — browsers have no prior
         # identity and RUM's guest-credentials model is the standard pattern.
         # The role's only permission is rum:PutRumEvents on this monitor.
-        NagSuppressions.add_resource_suppressions(
+        acknowledge_rules(
             rum_identity_pool,
             [
                 {
@@ -612,7 +611,7 @@ class FrontendStack(Stack):
             "Single least-privilege inline policy (rum:PutRumEvents on one monitor ARN) "
             "is tightly bound to this role's sole purpose — anonymous browser telemetry upload"
         )
-        NagSuppressions.add_resource_suppressions(
+        acknowledge_rules(
             rum_unauth_role,
             [
                 {"id": "NIST.800.53.R5-IAMNoInlinePolicy", "reason": inline_policy_reason},
@@ -672,6 +671,8 @@ class FrontendStack(Stack):
             queue_id="BucketDeploymentProviderDlq",
         )
 
+        self._acknowledge_bucket_deployment_grants(bucket)
+
         # minimizePolicies restructures the BucketDeployment handler's inline
         # policy into a separate resource under DeployFrontend/CustomResourceHandler.
         deploy_frontend = self.node.try_find_child("DeployFrontend")
@@ -691,9 +692,53 @@ class FrontendStack(Stack):
             ("PCI.DSS.321-S3BucketReplicationEnabled", replication_reason),
             ("PCI.DSS.321-S3BucketVersioningEnabled", versioning_reason),
         ]
-        NagSuppressions.add_stack_suppressions(
+        acknowledge_rules(
             self,
             [{"id": rule, "reason": reason} for rule, reason in stack_suppressions],
+        )
+
+    def _acknowledge_bucket_deployment_grants(self, bucket: s3.Bucket) -> None:
+        """Acknowledge the BucketDeployment handler's CDK-generated s3 grants.
+
+        cdk-nag v3 matches IAM5 findings individually, so these are enumerated
+        here rather than in the shared CDK_LAMBDA_SUPPRESSIONS list: the
+        asset-bucket finding id embeds this stack's region (and the default
+        bootstrap qualifier hnb659fds), and the destination-bucket finding id
+        embeds the bucket's logical id — neither is expressible in a static
+        shared list. The handler needs read on the CDK bootstrap asset bucket
+        and read/write/delete on the destination bucket; these seven findings
+        are exactly that policy, and anything new the handler grows will fail
+        the nag gate rather than being silently absorbed.
+        """
+        bucket_deployment_provider = self.node.try_find_child(BUCKET_DEPLOYMENT_PROVIDER_ID)
+        if bucket_deployment_provider is None:
+            return
+        deployment_reason = (
+            "CDK BucketDeployment handler policy — CDK-generated s3 read on the bootstrap asset "
+            "bucket and read/write/delete on the destination bucket; not configurable by the caller"
+        )
+        bucket_logical_id = self.get_logical_id(cast(s3.CfnBucket, bucket.node.default_child))
+        acknowledge_rules(
+            bucket_deployment_provider,
+            [
+                {
+                    "id": "AwsSolutions-IAM5",
+                    "reason": deployment_reason,
+                    "applies_to": [
+                        "Action::s3:GetBucket*",
+                        "Action::s3:GetObject*",
+                        "Action::s3:List*",
+                        "Action::s3:DeleteObject*",
+                        "Action::s3:Abort*",
+                        # Both partition renderings — see the RUM cleanup note:
+                        # the CLI synth resolves arn:aws: literals, the
+                        # flag-less test synth renders <AWS::Partition>.
+                        f"Resource::arn:aws:s3:::cdk-hnb659fds-assets-<AWS::AccountId>-{self.region}/*",
+                        f"Resource::arn:<AWS::Partition>:s3:::cdk-hnb659fds-assets-<AWS::AccountId>-{self.region}/*",
+                        f"Resource::<{bucket_logical_id}.Arn>/*",
+                    ],
+                },
+            ],
         )
 
     def _build_response_headers_policy(self) -> cloudfront.ResponseHeadersPolicy:
@@ -892,14 +937,13 @@ class FrontendStack(Stack):
             "scoped to specific rum:* actions on one monitor ARN; managed-policy reuse adds nothing"
         )
         for construct in (rum_metrics_destination, rum_extended_metrics):
-            NagSuppressions.add_resource_suppressions(
+            acknowledge_rules(
                 construct,
                 [
                     {"id": "NIST.800.53.R5-IAMNoInlinePolicy", "reason": reason},
                     {"id": "HIPAA.Security-IAMNoInlinePolicy", "reason": reason},
                     {"id": "PCI.DSS.321-IAMNoInlinePolicy", "reason": reason},
                 ],
-                apply_to_children=True,
             )
         return rum_extended_metrics
 
@@ -925,13 +969,18 @@ class FrontendStack(Stack):
         """
         monitor_id_prefix = Fn.select(0, Fn.split("-", rum_app_monitor.attr_id))
         log_group_name = Fn.join("", [f"/aws/vendedlogs/RUMService_{rum_monitor_name}", monitor_id_prefix])
-        log_group_arn = Fn.join(
-            "",
-            [
-                f"arn:{self.partition}:logs:{self.region}:{self.account}:log-group:/aws/vendedlogs/RUMService_{rum_monitor_name}",
-                monitor_id_prefix,
-                ":*",
-            ],
+        # The IAM scope uses a name-suffix wildcard (RUMService_{name}*) instead
+        # of folding the runtime-resolved monitor-id token into the ARN. The
+        # delete call itself still targets the exact log group (log_group_name
+        # above); widening only the *grant* from "this monitor id" to "this
+        # monitor name, any id" costs nothing real — the name embeds the stack
+        # name — and keeps the ARN a plain literal, which cdk-nag v3 needs: its
+        # granular IAM5 finding id is the verbatim resource string, and a token
+        # in the ARN would serialize an Fn::Select JSON blob into the finding id
+        # this code must then reproduce byte-for-byte to acknowledge.
+        log_group_arn = (
+            f"arn:{self.partition}:logs:{self.region}:{self.account}:"
+            f"log-group:/aws/vendedlogs/RUMService_{rum_monitor_name}*:*"
         )
         cleanup = cr.AwsCustomResource(
             self,
@@ -957,28 +1006,38 @@ class FrontendStack(Stack):
             "Single least-privilege inline policy attached to the CDK AwsCustomResource handler — "
             "scoped to logs:DeleteLogGroup on one log-group ARN; managed-policy reuse adds nothing"
         )
-        # AwsSolutions-IAM5 fires because the log-group ARN ends in `:*`, which
-        # is the standard CloudWatch Logs log-stream wildcard required by every
-        # log-group resource ARN per the IAM docs — there is no way to grant
-        # logs:DeleteLogGroup on a log group without the `:*` suffix. The
-        # resource is otherwise fully scoped to one specific log group (path
-        # built from this monitor's runtime-resolved ID prefix), so the
-        # wildcard portion only authorizes log-stream-scope wildcards within
-        # that one log group, not across log groups.
+        # AwsSolutions-IAM5 fires on the two wildcards in the grant ARN: the
+        # standard :* log-stream suffix required by every CloudWatch Logs
+        # resource ARN per the IAM docs, and the monitor-name suffix wildcard
+        # explained on log_group_arn above. The acknowledgment pins the exact
+        # finding id (cdk-nag v3 renders the verbatim resource string, with
+        # pseudo-parameters as <AWS::Partition>/<AWS::AccountId> placeholders).
         iam5_reason = (
-            "Log-group ARN includes the standard :* log-stream wildcard suffix — required for any "
-            "CloudWatch Logs resource ARN per the IAM service authorization docs. The resource is "
-            "otherwise scoped to one specific log group built from the monitor's runtime-resolved ID."
+            "Log-group ARN carries the standard :* log-stream wildcard suffix (required for any "
+            "CloudWatch Logs resource ARN per the IAM service authorization docs) plus a monitor-name "
+            "suffix wildcard that keeps the ARN literal for cdk-nag v3's verbatim finding ids — the "
+            "grant still reaches only this stack's RUM vended log group namespace."
         )
-        NagSuppressions.add_resource_suppressions(
+        # Both partition renderings: the CLI synth resolves arn:aws: literals
+        # (cdk.json's @aws-cdk/core:enablePartitionLiterals + target-partitions
+        # ["aws"]), while the flag-less in-process test synth renders the
+        # <AWS::Partition> placeholder — and cdk-nag v3's raw IAM5 resource
+        # finding ids reproduce whichever form the template carries (unlike
+        # IAM4, which normalizes the partition). Acknowledge both so the CLI
+        # gate and the test gate stay in lockstep.
+        rum_log_group_findings = [
+            f"Resource::arn:{partition}:logs:{self.region}:<AWS::AccountId>:"
+            f"log-group:/aws/vendedlogs/RUMService_{rum_monitor_name}*:*"
+            for partition in ("aws", "<AWS::Partition>")
+        ]
+        acknowledge_rules(
             cleanup,
             [
                 {"id": "NIST.800.53.R5-IAMNoInlinePolicy", "reason": reason},
                 {"id": "HIPAA.Security-IAMNoInlinePolicy", "reason": reason},
                 {"id": "PCI.DSS.321-IAMNoInlinePolicy", "reason": reason},
-                {"id": "AwsSolutions-IAM5", "reason": iam5_reason, "applies_to": ["Resource::*"]},
+                {"id": "AwsSolutions-IAM5", "reason": iam5_reason, "applies_to": rum_log_group_findings},
             ],
-            apply_to_children=True,
         )
 
     def _create_athena_glue_resources(self, access_log_bucket: s3.Bucket, encryption_key: kms.Key) -> None:

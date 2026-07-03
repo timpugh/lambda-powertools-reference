@@ -167,6 +167,64 @@
         "AutoDeleteObjectsLogGroupC1303B18",
         "CloudTrailLogsBucketPolicyF40858DB"
       ],
+      "Metadata": {
+        "cdk_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "AwsSolutions-S1",
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
+            },
+            {
+              "id": "NIST.800.53.R5-S3BucketLoggingEnabled",
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
+            },
+            {
+              "id": "HIPAA.Security-S3BucketLoggingEnabled",
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
+            },
+            {
+              "id": "PCI.DSS.321-S3BucketLoggingEnabled",
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
+            },
+            {
+              "id": "NIST.800.53.R5-S3DefaultEncryptionKMS",
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
+            },
+            {
+              "id": "HIPAA.Security-S3DefaultEncryptionKMS",
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
+            },
+            {
+              "id": "PCI.DSS.321-S3DefaultEncryptionKMS",
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
+            },
+            {
+              "id": "NIST.800.53.R5-S3BucketVersioningEnabled",
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
+            },
+            {
+              "id": "HIPAA.Security-S3BucketVersioningEnabled",
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
+            },
+            {
+              "id": "PCI.DSS.321-S3BucketVersioningEnabled",
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
+            },
+            {
+              "id": "NIST.800.53.R5-S3BucketReplicationEnabled",
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
+            },
+            {
+              "id": "HIPAA.Security-S3BucketReplicationEnabled",
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
+            },
+            {
+              "id": "PCI.DSS.321-S3BucketReplicationEnabled",
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
+            }
+          ]
+        }
+      },
       "Properties": {
         "BucketName": {
           "Ref": "CloudTrailLogsBucketF4E95F70"
@@ -188,68 +246,55 @@
           "rules_to_suppress": [
             {
               "id": "AwsSolutions-S1",
-              "is_reason_encoded": true,
-              "reason": "Q2xvdWRUcmFpbCBsb2cgYnVja2V0IOKAlCBTU0UtUzMgKENsb3VkVHJhaWwgZGVsaXZlcnkgZG9lc24ndCBzdXBwb3J0IEtNUy1DTUsgZGVzdGluYXRpb24gYnVja2V0czsgdHJhaWwgbG9nIGZpbGVzIGFyZSBwZXItb2JqZWN0IFNTRS1LTVMpLCBzZWxmLWxvZ2dpbmcgd291bGQgY3JlYXRlIGNpcmN1bGFyIGF1ZGl0IHRyYWlscywgbm8gdmVyc2lvbmluZy9yZXBsaWNhdGlvbiBmb3IgYW4gYXBwZW5kLW9ubHksIGludGVncml0eS12YWxpZGF0ZWQgbG9nIHNpbms="
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
             },
             {
               "id": "NIST.800.53.R5-S3BucketLoggingEnabled",
-              "is_reason_encoded": true,
-              "reason": "Q2xvdWRUcmFpbCBsb2cgYnVja2V0IOKAlCBTU0UtUzMgKENsb3VkVHJhaWwgZGVsaXZlcnkgZG9lc24ndCBzdXBwb3J0IEtNUy1DTUsgZGVzdGluYXRpb24gYnVja2V0czsgdHJhaWwgbG9nIGZpbGVzIGFyZSBwZXItb2JqZWN0IFNTRS1LTVMpLCBzZWxmLWxvZ2dpbmcgd291bGQgY3JlYXRlIGNpcmN1bGFyIGF1ZGl0IHRyYWlscywgbm8gdmVyc2lvbmluZy9yZXBsaWNhdGlvbiBmb3IgYW4gYXBwZW5kLW9ubHksIGludGVncml0eS12YWxpZGF0ZWQgbG9nIHNpbms="
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
             },
             {
               "id": "HIPAA.Security-S3BucketLoggingEnabled",
-              "is_reason_encoded": true,
-              "reason": "Q2xvdWRUcmFpbCBsb2cgYnVja2V0IOKAlCBTU0UtUzMgKENsb3VkVHJhaWwgZGVsaXZlcnkgZG9lc24ndCBzdXBwb3J0IEtNUy1DTUsgZGVzdGluYXRpb24gYnVja2V0czsgdHJhaWwgbG9nIGZpbGVzIGFyZSBwZXItb2JqZWN0IFNTRS1LTVMpLCBzZWxmLWxvZ2dpbmcgd291bGQgY3JlYXRlIGNpcmN1bGFyIGF1ZGl0IHRyYWlscywgbm8gdmVyc2lvbmluZy9yZXBsaWNhdGlvbiBmb3IgYW4gYXBwZW5kLW9ubHksIGludGVncml0eS12YWxpZGF0ZWQgbG9nIHNpbms="
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
             },
             {
               "id": "PCI.DSS.321-S3BucketLoggingEnabled",
-              "is_reason_encoded": true,
-              "reason": "Q2xvdWRUcmFpbCBsb2cgYnVja2V0IOKAlCBTU0UtUzMgKENsb3VkVHJhaWwgZGVsaXZlcnkgZG9lc24ndCBzdXBwb3J0IEtNUy1DTUsgZGVzdGluYXRpb24gYnVja2V0czsgdHJhaWwgbG9nIGZpbGVzIGFyZSBwZXItb2JqZWN0IFNTRS1LTVMpLCBzZWxmLWxvZ2dpbmcgd291bGQgY3JlYXRlIGNpcmN1bGFyIGF1ZGl0IHRyYWlscywgbm8gdmVyc2lvbmluZy9yZXBsaWNhdGlvbiBmb3IgYW4gYXBwZW5kLW9ubHksIGludGVncml0eS12YWxpZGF0ZWQgbG9nIHNpbms="
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
             },
             {
               "id": "NIST.800.53.R5-S3DefaultEncryptionKMS",
-              "is_reason_encoded": true,
-              "reason": "Q2xvdWRUcmFpbCBsb2cgYnVja2V0IOKAlCBTU0UtUzMgKENsb3VkVHJhaWwgZGVsaXZlcnkgZG9lc24ndCBzdXBwb3J0IEtNUy1DTUsgZGVzdGluYXRpb24gYnVja2V0czsgdHJhaWwgbG9nIGZpbGVzIGFyZSBwZXItb2JqZWN0IFNTRS1LTVMpLCBzZWxmLWxvZ2dpbmcgd291bGQgY3JlYXRlIGNpcmN1bGFyIGF1ZGl0IHRyYWlscywgbm8gdmVyc2lvbmluZy9yZXBsaWNhdGlvbiBmb3IgYW4gYXBwZW5kLW9ubHksIGludGVncml0eS12YWxpZGF0ZWQgbG9nIHNpbms="
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
             },
             {
               "id": "HIPAA.Security-S3DefaultEncryptionKMS",
-              "is_reason_encoded": true,
-              "reason": "Q2xvdWRUcmFpbCBsb2cgYnVja2V0IOKAlCBTU0UtUzMgKENsb3VkVHJhaWwgZGVsaXZlcnkgZG9lc24ndCBzdXBwb3J0IEtNUy1DTUsgZGVzdGluYXRpb24gYnVja2V0czsgdHJhaWwgbG9nIGZpbGVzIGFyZSBwZXItb2JqZWN0IFNTRS1LTVMpLCBzZWxmLWxvZ2dpbmcgd291bGQgY3JlYXRlIGNpcmN1bGFyIGF1ZGl0IHRyYWlscywgbm8gdmVyc2lvbmluZy9yZXBsaWNhdGlvbiBmb3IgYW4gYXBwZW5kLW9ubHksIGludGVncml0eS12YWxpZGF0ZWQgbG9nIHNpbms="
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
             },
             {
               "id": "PCI.DSS.321-S3DefaultEncryptionKMS",
-              "is_reason_encoded": true,
-              "reason": "Q2xvdWRUcmFpbCBsb2cgYnVja2V0IOKAlCBTU0UtUzMgKENsb3VkVHJhaWwgZGVsaXZlcnkgZG9lc24ndCBzdXBwb3J0IEtNUy1DTUsgZGVzdGluYXRpb24gYnVja2V0czsgdHJhaWwgbG9nIGZpbGVzIGFyZSBwZXItb2JqZWN0IFNTRS1LTVMpLCBzZWxmLWxvZ2dpbmcgd291bGQgY3JlYXRlIGNpcmN1bGFyIGF1ZGl0IHRyYWlscywgbm8gdmVyc2lvbmluZy9yZXBsaWNhdGlvbiBmb3IgYW4gYXBwZW5kLW9ubHksIGludGVncml0eS12YWxpZGF0ZWQgbG9nIHNpbms="
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
             },
             {
               "id": "NIST.800.53.R5-S3BucketVersioningEnabled",
-              "is_reason_encoded": true,
-              "reason": "Q2xvdWRUcmFpbCBsb2cgYnVja2V0IOKAlCBTU0UtUzMgKENsb3VkVHJhaWwgZGVsaXZlcnkgZG9lc24ndCBzdXBwb3J0IEtNUy1DTUsgZGVzdGluYXRpb24gYnVja2V0czsgdHJhaWwgbG9nIGZpbGVzIGFyZSBwZXItb2JqZWN0IFNTRS1LTVMpLCBzZWxmLWxvZ2dpbmcgd291bGQgY3JlYXRlIGNpcmN1bGFyIGF1ZGl0IHRyYWlscywgbm8gdmVyc2lvbmluZy9yZXBsaWNhdGlvbiBmb3IgYW4gYXBwZW5kLW9ubHksIGludGVncml0eS12YWxpZGF0ZWQgbG9nIHNpbms="
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
             },
             {
               "id": "HIPAA.Security-S3BucketVersioningEnabled",
-              "is_reason_encoded": true,
-              "reason": "Q2xvdWRUcmFpbCBsb2cgYnVja2V0IOKAlCBTU0UtUzMgKENsb3VkVHJhaWwgZGVsaXZlcnkgZG9lc24ndCBzdXBwb3J0IEtNUy1DTUsgZGVzdGluYXRpb24gYnVja2V0czsgdHJhaWwgbG9nIGZpbGVzIGFyZSBwZXItb2JqZWN0IFNTRS1LTVMpLCBzZWxmLWxvZ2dpbmcgd291bGQgY3JlYXRlIGNpcmN1bGFyIGF1ZGl0IHRyYWlscywgbm8gdmVyc2lvbmluZy9yZXBsaWNhdGlvbiBmb3IgYW4gYXBwZW5kLW9ubHksIGludGVncml0eS12YWxpZGF0ZWQgbG9nIHNpbms="
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
             },
             {
               "id": "PCI.DSS.321-S3BucketVersioningEnabled",
-              "is_reason_encoded": true,
-              "reason": "Q2xvdWRUcmFpbCBsb2cgYnVja2V0IOKAlCBTU0UtUzMgKENsb3VkVHJhaWwgZGVsaXZlcnkgZG9lc24ndCBzdXBwb3J0IEtNUy1DTUsgZGVzdGluYXRpb24gYnVja2V0czsgdHJhaWwgbG9nIGZpbGVzIGFyZSBwZXItb2JqZWN0IFNTRS1LTVMpLCBzZWxmLWxvZ2dpbmcgd291bGQgY3JlYXRlIGNpcmN1bGFyIGF1ZGl0IHRyYWlscywgbm8gdmVyc2lvbmluZy9yZXBsaWNhdGlvbiBmb3IgYW4gYXBwZW5kLW9ubHksIGludGVncml0eS12YWxpZGF0ZWQgbG9nIHNpbms="
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
             },
             {
               "id": "NIST.800.53.R5-S3BucketReplicationEnabled",
-              "is_reason_encoded": true,
-              "reason": "Q2xvdWRUcmFpbCBsb2cgYnVja2V0IOKAlCBTU0UtUzMgKENsb3VkVHJhaWwgZGVsaXZlcnkgZG9lc24ndCBzdXBwb3J0IEtNUy1DTUsgZGVzdGluYXRpb24gYnVja2V0czsgdHJhaWwgbG9nIGZpbGVzIGFyZSBwZXItb2JqZWN0IFNTRS1LTVMpLCBzZWxmLWxvZ2dpbmcgd291bGQgY3JlYXRlIGNpcmN1bGFyIGF1ZGl0IHRyYWlscywgbm8gdmVyc2lvbmluZy9yZXBsaWNhdGlvbiBmb3IgYW4gYXBwZW5kLW9ubHksIGludGVncml0eS12YWxpZGF0ZWQgbG9nIHNpbms="
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
             },
             {
               "id": "HIPAA.Security-S3BucketReplicationEnabled",
-              "is_reason_encoded": true,
-              "reason": "Q2xvdWRUcmFpbCBsb2cgYnVja2V0IOKAlCBTU0UtUzMgKENsb3VkVHJhaWwgZGVsaXZlcnkgZG9lc24ndCBzdXBwb3J0IEtNUy1DTUsgZGVzdGluYXRpb24gYnVja2V0czsgdHJhaWwgbG9nIGZpbGVzIGFyZSBwZXItb2JqZWN0IFNTRS1LTVMpLCBzZWxmLWxvZ2dpbmcgd291bGQgY3JlYXRlIGNpcmN1bGFyIGF1ZGl0IHRyYWlscywgbm8gdmVyc2lvbmluZy9yZXBsaWNhdGlvbiBmb3IgYW4gYXBwZW5kLW9ubHksIGludGVncml0eS12YWxpZGF0ZWQgbG9nIHNpbms="
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
             },
             {
               "id": "PCI.DSS.321-S3BucketReplicationEnabled",
-              "is_reason_encoded": true,
-              "reason": "Q2xvdWRUcmFpbCBsb2cgYnVja2V0IOKAlCBTU0UtUzMgKENsb3VkVHJhaWwgZGVsaXZlcnkgZG9lc24ndCBzdXBwb3J0IEtNUy1DTUsgZGVzdGluYXRpb24gYnVja2V0czsgdHJhaWwgbG9nIGZpbGVzIGFyZSBwZXItb2JqZWN0IFNTRS1LTVMpLCBzZWxmLWxvZ2dpbmcgd291bGQgY3JlYXRlIGNpcmN1bGFyIGF1ZGl0IHRyYWlscywgbm8gdmVyc2lvbmluZy9yZXBsaWNhdGlvbiBmb3IgYW4gYXBwZW5kLW9ubHksIGludGVncml0eS12YWxpZGF0ZWQgbG9nIHNpbms="
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
             }
           ]
         }
@@ -293,6 +338,64 @@
       "UpdateReplacePolicy": "Delete"
     },
     "CloudTrailLogsBucketPolicyF40858DB": {
+      "Metadata": {
+        "cdk_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "AwsSolutions-S1",
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
+            },
+            {
+              "id": "NIST.800.53.R5-S3BucketLoggingEnabled",
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
+            },
+            {
+              "id": "HIPAA.Security-S3BucketLoggingEnabled",
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
+            },
+            {
+              "id": "PCI.DSS.321-S3BucketLoggingEnabled",
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
+            },
+            {
+              "id": "NIST.800.53.R5-S3DefaultEncryptionKMS",
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
+            },
+            {
+              "id": "HIPAA.Security-S3DefaultEncryptionKMS",
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
+            },
+            {
+              "id": "PCI.DSS.321-S3DefaultEncryptionKMS",
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
+            },
+            {
+              "id": "NIST.800.53.R5-S3BucketVersioningEnabled",
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
+            },
+            {
+              "id": "HIPAA.Security-S3BucketVersioningEnabled",
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
+            },
+            {
+              "id": "PCI.DSS.321-S3BucketVersioningEnabled",
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
+            },
+            {
+              "id": "NIST.800.53.R5-S3BucketReplicationEnabled",
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
+            },
+            {
+              "id": "HIPAA.Security-S3BucketReplicationEnabled",
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
+            },
+            {
+              "id": "PCI.DSS.321-S3BucketReplicationEnabled",
+              "reason": "CloudTrail log bucket \u2014 SSE-S3 (CloudTrail delivery doesn't support KMS-CMK destination buckets; trail log files are per-object SSE-KMS), self-logging would create circular audit trails, no versioning/replication for an append-only, integrity-validated log sink"
+            }
+          ]
+        }
+      },
       "Properties": {
         "Bucket": {
           "Ref": "CloudTrailLogsBucketF4E95F70"
@@ -520,31 +623,20 @@
         "cdk_nag": {
           "rules_to_suppress": [
             {
-              "id": "AwsSolutions-IAM4",
-              "reason": "CDK-managed singleton Lambda uses AWS managed execution role"
-            },
-            {
-              "id": "AwsSolutions-IAM5",
-              "reason": "CDK-managed singleton Lambda uses wildcard in auto-generated policy"
-            },
-            {
               "id": "AwsSolutions-L1",
               "reason": "CDK-managed singleton Lambda runtime is not configurable"
             },
             {
               "id": "Serverless-LambdaTracing",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgdHJhY2luZyBpcyBub3QgY29uZmlndXJhYmxl"
+              "reason": "CDK-managed singleton Lambda \u2014 tracing is not configurable"
             },
             {
               "id": "Serverless-LambdaDLQ",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgRExRIGlzIG5vdCBjb25maWd1cmFibGU="
+              "reason": "CDK-managed singleton Lambda \u2014 DLQ is not configurable"
             },
             {
               "id": "Serverless-LambdaDefaultMemorySize",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgbWVtb3J5IGlzIG5vdCBjb25maWd1cmFibGU="
+              "reason": "CDK-managed singleton Lambda \u2014 memory is not configurable"
             },
             {
               "id": "Serverless-LambdaLatestVersion",
@@ -556,18 +648,15 @@
             },
             {
               "id": "NIST.800.53.R5-LambdaDLQ",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgRExRIGlzIG5vdCBjb25maWd1cmFibGU="
+              "reason": "CDK-managed singleton Lambda \u2014 DLQ is not configurable"
             },
             {
               "id": "NIST.800.53.R5-LambdaConcurrency",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgY29uY3VycmVuY3kgaXMgbm90IGNvbmZpZ3VyYWJsZQ=="
+              "reason": "CDK-managed singleton Lambda \u2014 concurrency is not configurable"
             },
             {
               "id": "NIST.800.53.R5-LambdaInsideVPC",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgVlBDIGlzIG5vdCBjb25maWd1cmFibGU="
+              "reason": "CDK-managed singleton Lambda \u2014 VPC is not configurable"
             },
             {
               "id": "HIPAA.Security-IAMNoInlinePolicy",
@@ -575,18 +664,15 @@
             },
             {
               "id": "HIPAA.Security-LambdaDLQ",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgRExRIGlzIG5vdCBjb25maWd1cmFibGU="
+              "reason": "CDK-managed singleton Lambda \u2014 DLQ is not configurable"
             },
             {
               "id": "HIPAA.Security-LambdaConcurrency",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgY29uY3VycmVuY3kgaXMgbm90IGNvbmZpZ3VyYWJsZQ=="
+              "reason": "CDK-managed singleton Lambda \u2014 concurrency is not configurable"
             },
             {
               "id": "HIPAA.Security-LambdaInsideVPC",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgVlBDIGlzIG5vdCBjb25maWd1cmFibGU="
+              "reason": "CDK-managed singleton Lambda \u2014 VPC is not configurable"
             },
             {
               "id": "PCI.DSS.321-IAMNoInlinePolicy",
@@ -594,8 +680,11 @@
             },
             {
               "id": "PCI.DSS.321-LambdaInsideVPC",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgVlBDIGlzIG5vdCBjb25maWd1cmFibGU="
+              "reason": "CDK-managed singleton Lambda \u2014 VPC is not configurable"
+            },
+            {
+              "id": "AwsSolutions-IAM4[Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole]",
+              "reason": "CDK-managed singleton Lambda uses AWS managed execution role"
             }
           ]
         }
@@ -637,31 +726,20 @@
         "cdk_nag": {
           "rules_to_suppress": [
             {
-              "id": "AwsSolutions-IAM4",
-              "reason": "CDK-managed singleton Lambda uses AWS managed execution role"
-            },
-            {
-              "id": "AwsSolutions-IAM5",
-              "reason": "CDK-managed singleton Lambda uses wildcard in auto-generated policy"
-            },
-            {
               "id": "AwsSolutions-L1",
               "reason": "CDK-managed singleton Lambda runtime is not configurable"
             },
             {
               "id": "Serverless-LambdaTracing",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgdHJhY2luZyBpcyBub3QgY29uZmlndXJhYmxl"
+              "reason": "CDK-managed singleton Lambda \u2014 tracing is not configurable"
             },
             {
               "id": "Serverless-LambdaDLQ",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgRExRIGlzIG5vdCBjb25maWd1cmFibGU="
+              "reason": "CDK-managed singleton Lambda \u2014 DLQ is not configurable"
             },
             {
               "id": "Serverless-LambdaDefaultMemorySize",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgbWVtb3J5IGlzIG5vdCBjb25maWd1cmFibGU="
+              "reason": "CDK-managed singleton Lambda \u2014 memory is not configurable"
             },
             {
               "id": "Serverless-LambdaLatestVersion",
@@ -673,18 +751,15 @@
             },
             {
               "id": "NIST.800.53.R5-LambdaDLQ",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgRExRIGlzIG5vdCBjb25maWd1cmFibGU="
+              "reason": "CDK-managed singleton Lambda \u2014 DLQ is not configurable"
             },
             {
               "id": "NIST.800.53.R5-LambdaConcurrency",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgY29uY3VycmVuY3kgaXMgbm90IGNvbmZpZ3VyYWJsZQ=="
+              "reason": "CDK-managed singleton Lambda \u2014 concurrency is not configurable"
             },
             {
               "id": "NIST.800.53.R5-LambdaInsideVPC",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgVlBDIGlzIG5vdCBjb25maWd1cmFibGU="
+              "reason": "CDK-managed singleton Lambda \u2014 VPC is not configurable"
             },
             {
               "id": "HIPAA.Security-IAMNoInlinePolicy",
@@ -692,18 +767,15 @@
             },
             {
               "id": "HIPAA.Security-LambdaDLQ",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgRExRIGlzIG5vdCBjb25maWd1cmFibGU="
+              "reason": "CDK-managed singleton Lambda \u2014 DLQ is not configurable"
             },
             {
               "id": "HIPAA.Security-LambdaConcurrency",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgY29uY3VycmVuY3kgaXMgbm90IGNvbmZpZ3VyYWJsZQ=="
+              "reason": "CDK-managed singleton Lambda \u2014 concurrency is not configurable"
             },
             {
               "id": "HIPAA.Security-LambdaInsideVPC",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgVlBDIGlzIG5vdCBjb25maWd1cmFibGU="
+              "reason": "CDK-managed singleton Lambda \u2014 VPC is not configurable"
             },
             {
               "id": "PCI.DSS.321-IAMNoInlinePolicy",
@@ -711,8 +783,11 @@
             },
             {
               "id": "PCI.DSS.321-LambdaInsideVPC",
-              "is_reason_encoded": true,
-              "reason": "Q0RLLW1hbmFnZWQgc2luZ2xldG9uIExhbWJkYSDigJQgVlBDIGlzIG5vdCBjb25maWd1cmFibGU="
+              "reason": "CDK-managed singleton Lambda \u2014 VPC is not configurable"
+            },
+            {
+              "id": "AwsSolutions-IAM4[Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole]",
+              "reason": "CDK-managed singleton Lambda uses AWS managed execution role"
             }
           ]
         }
@@ -749,18 +824,15 @@
           "rules_to_suppress": [
             {
               "id": "NIST.800.53.R5-IAMNoInlinePolicy",
-              "is_reason_encoded": true,
-              "reason": "Q0RLIGdlbmVyYXRlcyB0aGUgdHJhaWwncyBMb2dzUm9sZSBkZWZhdWx0IHBvbGljeSBpbmxpbmUg4oCUIG5vdCBkaXJlY3RseSBjb25maWd1cmFibGU="
+              "reason": "CDK generates the trail's LogsRole default policy inline \u2014 not directly configurable"
             },
             {
               "id": "HIPAA.Security-IAMNoInlinePolicy",
-              "is_reason_encoded": true,
-              "reason": "Q0RLIGdlbmVyYXRlcyB0aGUgdHJhaWwncyBMb2dzUm9sZSBkZWZhdWx0IHBvbGljeSBpbmxpbmUg4oCUIG5vdCBkaXJlY3RseSBjb25maWd1cmFibGU="
+              "reason": "CDK generates the trail's LogsRole default policy inline \u2014 not directly configurable"
             },
             {
               "id": "PCI.DSS.321-IAMNoInlinePolicy",
-              "is_reason_encoded": true,
-              "reason": "Q0RLIGdlbmVyYXRlcyB0aGUgdHJhaWwncyBMb2dzUm9sZSBkZWZhdWx0IHBvbGljeSBpbmxpbmUg4oCUIG5vdCBkaXJlY3RseSBjb25maWd1cmFibGU="
+              "reason": "CDK generates the trail's LogsRole default policy inline \u2014 not directly configurable"
             }
           ]
         }
@@ -849,18 +921,15 @@
           "rules_to_suppress": [
             {
               "id": "NIST.800.53.R5-IAMNoInlinePolicy",
-              "is_reason_encoded": true,
-              "reason": "Q0RLIGdlbmVyYXRlcyB0aGUgdHJhaWwncyBMb2dzUm9sZSBkZWZhdWx0IHBvbGljeSBpbmxpbmUg4oCUIG5vdCBkaXJlY3RseSBjb25maWd1cmFibGU="
+              "reason": "CDK generates the trail's LogsRole default policy inline \u2014 not directly configurable"
             },
             {
               "id": "HIPAA.Security-IAMNoInlinePolicy",
-              "is_reason_encoded": true,
-              "reason": "Q0RLIGdlbmVyYXRlcyB0aGUgdHJhaWwncyBMb2dzUm9sZSBkZWZhdWx0IHBvbGljeSBpbmxpbmUg4oCUIG5vdCBkaXJlY3RseSBjb25maWd1cmFibGU="
+              "reason": "CDK generates the trail's LogsRole default policy inline \u2014 not directly configurable"
             },
             {
               "id": "PCI.DSS.321-IAMNoInlinePolicy",
-              "is_reason_encoded": true,
-              "reason": "Q0RLIGdlbmVyYXRlcyB0aGUgdHJhaWwncyBMb2dzUm9sZSBkZWZhdWx0IHBvbGljeSBpbmxpbmUg4oCUIG5vdCBkaXJlY3RseSBjb25maWd1cmFibGU="
+              "reason": "CDK generates the trail's LogsRole default policy inline \u2014 not directly configurable"
             }
           ]
         }
@@ -887,18 +956,15 @@
           "rules_to_suppress": [
             {
               "id": "NIST.800.53.R5-IAMNoInlinePolicy",
-              "is_reason_encoded": true,
-              "reason": "Q0RLIGdlbmVyYXRlcyB0aGUgdHJhaWwncyBMb2dzUm9sZSBkZWZhdWx0IHBvbGljeSBpbmxpbmUg4oCUIG5vdCBkaXJlY3RseSBjb25maWd1cmFibGU="
+              "reason": "CDK generates the trail's LogsRole default policy inline \u2014 not directly configurable"
             },
             {
               "id": "HIPAA.Security-IAMNoInlinePolicy",
-              "is_reason_encoded": true,
-              "reason": "Q0RLIGdlbmVyYXRlcyB0aGUgdHJhaWwncyBMb2dzUm9sZSBkZWZhdWx0IHBvbGljeSBpbmxpbmUg4oCUIG5vdCBkaXJlY3RseSBjb25maWd1cmFibGU="
+              "reason": "CDK generates the trail's LogsRole default policy inline \u2014 not directly configurable"
             },
             {
               "id": "PCI.DSS.321-IAMNoInlinePolicy",
-              "is_reason_encoded": true,
-              "reason": "Q0RLIGdlbmVyYXRlcyB0aGUgdHJhaWwncyBMb2dzUm9sZSBkZWZhdWx0IHBvbGljeSBpbmxpbmUg4oCUIG5vdCBkaXJlY3RseSBjb25maWd1cmFibGU="
+              "reason": "CDK generates the trail's LogsRole default policy inline \u2014 not directly configurable"
             }
           ]
         }

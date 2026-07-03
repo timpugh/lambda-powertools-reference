@@ -27,10 +27,9 @@ from typing import Any
 from aws_cdk import CfnOutput, Duration, RemovalPolicy, Stack
 from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_kms as kms
-from cdk_nag import NagSuppressions
 from constructs import Construct
 
-from infrastructure.nag_utils import apply_compliance_aspects
+from infrastructure.nag_utils import acknowledge_rules, apply_compliance_aspects
 
 
 class DataStack(Stack):
@@ -116,7 +115,7 @@ class DataStack(Stack):
         # scope for this reference (PITR covers the rolling-window recovery a
         # TTL'd idempotency cache needs); production forks that set
         # retain_data=True should also add AWS Backup — see TODO.md.
-        NagSuppressions.add_stack_suppressions(
+        acknowledge_rules(
             self,
             [
                 {

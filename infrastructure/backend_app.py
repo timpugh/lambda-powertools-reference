@@ -76,10 +76,10 @@ from cdk_monitoring_constructs import (
     MonitoringFacade,
     SnsAlarmActionStrategy,
 )
-from cdk_nag import NagSuppressions
 from constructs import Construct
 
 from infrastructure.nag_utils import (
+    acknowledge_rules,
     build_managed_threat_rules,
     create_auto_delete_objects_log_group,
     create_waf_logs_bucket,
@@ -781,7 +781,7 @@ class BackendApp(Construct):
             # on every alarm under the facade. Scoped to the monitoring subtree;
             # the production shape routes every alarm to SNS and needs no
             # suppression.
-            NagSuppressions.add_resource_suppressions(
+            acknowledge_rules(
                 monitoring,
                 [
                     {
@@ -793,7 +793,6 @@ class BackendApp(Construct):
                         "reason": "Ephemeral/dev environment — alarms are dashboard signals only; no paging channel by design",
                     },
                 ],
-                apply_to_children=True,
             )
 
         return alarm_topic
@@ -1023,15 +1022,17 @@ class BackendApp(Construct):
             # Roll back on a failed deployment or if the alarm fires mid-shift.
             auto_rollback=codedeploy.AutoRollbackConfig(failed_deployment=True, deployment_in_alarm=True),
         )
-        NagSuppressions.add_resource_suppressions(
+        acknowledge_rules(
             deployment_group,
             [
                 {
                     "id": "AwsSolutions-IAM4",
                     "reason": "CodeDeploy service role uses the AWS managed AWSCodeDeployRoleForLambdaLimited policy — the documented least-privilege role for Lambda traffic-shifting deployments",
+                    "applies_to": [
+                        "Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AWSCodeDeployRoleForLambdaLimited"
+                    ],
                 },
             ],
-            apply_to_children=True,
         )
 
     def _attach_appconfig_rollback_monitor(self, app_config_env: appconfig.CfnEnvironment) -> None:
@@ -1102,7 +1103,7 @@ class BackendApp(Construct):
             description="Lets AppConfig read the rollback alarm state during a flag deployment",
         )
         monitor_role.add_to_policy(iam.PolicyStatement(actions=["cloudwatch:DescribeAlarms"], resources=["*"]))
-        NagSuppressions.add_resource_suppressions(
+        acknowledge_rules(
             monitor_role,
             [
                 {
@@ -1123,7 +1124,6 @@ class BackendApp(Construct):
                     "reason": "CDK-generated inline policy on the AppConfig monitor role",
                 },
             ],
-            apply_to_children=True,
         )
 
         # Wire the monitor onto the environment created earlier. Set here (rather
@@ -1151,7 +1151,7 @@ class BackendApp(Construct):
             f"Alarm is consumed by {consumer}, which polls its state to decide on rollback — "
             "not a notification channel, so no SNS action by design"
         )
-        NagSuppressions.add_resource_suppressions(
+        acknowledge_rules(
             alarm,
             [
                 {"id": "NIST.800.53.R5-CloudWatchAlarmAction", "reason": reason},
@@ -1167,7 +1167,7 @@ class BackendApp(Construct):
         intentional design decisions (no VPC, no DLQ, no concurrency) and work
         around CDK-level limitations (inline policies, KMS wildcard actions).
         """
-        NagSuppressions.add_resource_suppressions(
+        acknowledge_rules(
             self.function,
             [
                 # AwsSolutions-L1 / Serverless-LambdaLatestVersion suppressions
@@ -1201,7 +1201,9 @@ class BackendApp(Construct):
                 {"id": "NIST.800.53.R5-LambdaInsideVPC", "reason": "No VPC — adds significant operational complexity"},
                 {"id": "HIPAA.Security-LambdaInsideVPC", "reason": "No VPC — adds significant operational complexity"},
                 {"id": "PCI.DSS.321-LambdaInsideVPC", "reason": "No VPC — adds significant operational complexity"},
-                # Service role uses AWSLambdaBasicExecutionRole managed policy
+                # Service role uses AWSLambdaBasicExecutionRole managed policy.
+                # The Policy:: finding id contains multiple '::', which routes
+                # through acknowledge_rules' metadata fallback (see nag_utils).
                 {
                     "id": "AwsSolutions-IAM4",
                     "reason": "AWSLambdaBasicExecutionRole is the minimal managed policy for Lambda execution",
@@ -1237,13 +1239,12 @@ class BackendApp(Construct):
                     "reason": "CDK generates the default policy inline on the Lambda service role — not directly configurable",
                 },
             ],
-            apply_to_children=True,  # covers service role and default policy
         )
 
         # AppInsights cleanup custom resource policy: scoped to one dashboard ARN,
         # so only the inline-policy nag rules need a suppression — IAM5 wildcard
         # no longer applies since the policy is resource-scoped.
-        NagSuppressions.add_resource_suppressions(
+        acknowledge_rules(
             app_insights_dashboard_cleanup,
             [
                 {
@@ -1259,7 +1260,6 @@ class BackendApp(Construct):
                     "reason": "AwsCustomResource generates an inline policy — not directly configurable",
                 },
             ],
-            apply_to_children=True,
         )
 
         # API Gateway CloudWatch role — CDK-managed, uses managed policy.
@@ -1269,15 +1269,17 @@ class BackendApp(Construct):
         # execution logging, which requires the account-level CloudWatch role.
         api_cw_role = self.api.node.try_find_child("CloudWatchRole")
         if api_cw_role is not None:
-            NagSuppressions.add_resource_suppressions(
+            acknowledge_rules(
                 cast(Construct, api_cw_role),
                 [
                     {
                         "id": "AwsSolutions-IAM4",
                         "reason": "CDK-managed API Gateway CloudWatch role uses AWS managed policy",
+                        "applies_to": [
+                            "Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
+                        ],
                     }
                 ],
-                apply_to_children=True,
             )
 
     def _create_insights_queries(self, lambda_log_group: logs.LogGroup, api_log_group: logs.LogGroup) -> None:

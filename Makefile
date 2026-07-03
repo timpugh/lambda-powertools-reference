@@ -193,9 +193,16 @@ coverage-badge: ## Generate the shields-endpoint coverage badge JSON (whole repo
 cdk-synth: ## Synthesize all CDK stacks and validate cdk-nag rules (CDK CLI via `npm ci` / `make install`)
 	# The '**' glob descends into Stage-nested stacks. Without it, `cdk synth`
 	# stops at the Stage manifest, the five nested stacks never synthesize,
-	# and cdk-nag rules silently don't fire on them — so a "passing" synth
-	# can mask findings that surface later in `cdk deploy`.
+	# and asset bundling silently doesn't run on them.
+	#
+	# The explicit report check is the cdk-nag v3 hard gate: CDK signals a
+	# failed policy validation by setting process.exitCode in the NODE process,
+	# which for a Python app is jsii's throwaway kernel — so `cdk synth` exits 0
+	# even with findings (verified live; see scripts/check_validation_report.py).
+	# The checker fails on any violation AND on a missing report (packs not
+	# attached = broken gate, not a pass).
 	$(CDK) synth '**' $(CDK_ENV_ARG)
+	uv run python scripts/check_validation_report.py cdk.out
 
 cdk-notices: ## Show AWS-published CDK notices (CVEs, deprecated CDK versions, upcoming breaking changes)
 	$(CDK) notices

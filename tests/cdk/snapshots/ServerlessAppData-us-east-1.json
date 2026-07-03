@@ -1,20 +1,4 @@
 {
-  "Metadata": {
-    "cdk_nag": {
-      "rules_to_suppress": [
-        {
-          "id": "NIST.800.53.R5-DynamoDBInBackupPlan",
-          "is_reason_encoded": true,
-          "reason": "QVdTIEJhY2t1cCBwbGFuIG5vdCBjb25maWd1cmVkIGZvciBzYW1wbGUgYXBwIOKAlCBQSVRSIGlzIGVuYWJsZWQgZm9yIHBvaW50LWluLXRpbWUgcmVjb3Zlcnk="
-        },
-        {
-          "id": "HIPAA.Security-DynamoDBInBackupPlan",
-          "is_reason_encoded": true,
-          "reason": "QVdTIEJhY2t1cCBwbGFuIG5vdCBjb25maWd1cmVkIGZvciBzYW1wbGUgYXBwIOKAlCBQSVRSIGlzIGVuYWJsZWQgZm9yIHBvaW50LWluLXRpbWUgcmVjb3Zlcnk="
-        }
-      ]
-    }
-  },
   "Outputs": {
     "ExportsOutputFnGetAttDataEncryptionKey101796EEArn95D63FE8": {
       "Export": {
@@ -63,6 +47,20 @@
   "Resources": {
     "DataEncryptionKey101796EE": {
       "DeletionPolicy": "Delete",
+      "Metadata": {
+        "cdk_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "NIST.800.53.R5-DynamoDBInBackupPlan",
+              "reason": "AWS Backup plan not configured for sample app \u2014 PITR is enabled for point-in-time recovery"
+            },
+            {
+              "id": "HIPAA.Security-DynamoDBInBackupPlan",
+              "reason": "AWS Backup plan not configured for sample app \u2014 PITR is enabled for point-in-time recovery"
+            }
+          ]
+        }
+      },
       "Properties": {
         "Description": "KMS key for ServerlessAppData-us-east-1 DynamoDB",
         "EnableKeyRotation": true,
@@ -101,6 +99,20 @@
     },
     "IdempotencyTableV203A5298E": {
       "DeletionPolicy": "Delete",
+      "Metadata": {
+        "cdk_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "NIST.800.53.R5-DynamoDBInBackupPlan",
+              "reason": "AWS Backup plan not configured for sample app \u2014 PITR is enabled for point-in-time recovery"
+            },
+            {
+              "id": "HIPAA.Security-DynamoDBInBackupPlan",
+              "reason": "AWS Backup plan not configured for sample app \u2014 PITR is enabled for point-in-time recovery"
+            }
+          ]
+        }
+      },
       "Properties": {
         "AttributeDefinitions": [
           {

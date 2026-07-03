@@ -1,30 +1,54 @@
 """Shared cdk-nag helpers.
 
-``apply_compliance_aspects`` applies the full available rule-pack set to a
-stack so every stack exercises the same compliance gauntlet, plus this
+cdk-nag v3 rule packs are ``IPolicyValidationPlugin``s evaluated over the
+synthesized assembly, not per-stack ``IAspect``s — so pack attachment and
+suppression plumbing both live here in v3 form:
+
+``attach_nag_packs`` registers the five rule packs as policy-validation
+plugins on an App (or test App) root — once per tree, not once per stack.
+``apply_compliance_aspects`` remains per-stack but now carries only this
 project's own ``TemplateConventionChecks`` validation Aspect (log-group
 retention + explicit removal policy on stateful resources — see
-``infrastructure.validation_aspects``). NIST 800-53 R4 is intentionally omitted —
-R5 supersedes it and running both would duplicate findings on overlapping
-controls.
+``infrastructure.validation_aspects``). NIST 800-53 R4 is intentionally
+omitted — R5 supersedes it and running both would duplicate findings on
+overlapping controls.
+
+``acknowledge_rules`` is the project-wide adapter from this repo's
+suppression data shape (``{id, reason, applies_to?}`` dicts, unchanged from
+the v2 era so every call site's *data* stays diff-stable) onto v3's
+``Validations.of(construct).acknowledge()``: each ``applies_to`` entry
+expands to the granular ``Rule[Finding]`` id v3 requires, and entries
+without ``applies_to`` acknowledge the bare rule id. Acknowledgments apply
+to the construct's whole subtree (v3 walks the ancestor tree when matching),
+which subsumes v2's ``apply_to_children=True``.
 
 ``CDK_LAMBDA_SUPPRESSIONS`` is the canonical suppression list for CDK-managed
 singleton Lambdas (AwsCustomResource provider, BucketDeployment, S3AutoDeleteObjects).
 Their runtime, memory, tracing, DLQ, VPC, and IAM policies are all managed by
 CDK and cannot be configured by the caller. Import it and pass it to
-``NagSuppressions.add_resource_suppressions`` with ``apply_to_children=True``,
-or use the ``suppress_cdk_singletons`` helper. Absolute-path suppression
-(``add_resource_suppressions_by_path``) is intentionally avoided throughout this
-project: the singletons are resolved via ``node.try_find_child`` so suppressions
+``acknowledge_rules``, or use the ``suppress_cdk_singletons`` helper.
+Absolute-path suppression is intentionally avoided throughout this project:
+the singletons are resolved via ``node.try_find_child`` so suppressions
 keep working when the stacks are nested under a ``cdk.Stage`` (a path string
 would break on the added Stage prefix).
 """
 
 import hashlib
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import cast
 
-from aws_cdk import Annotations, Aspects, CfnOutput, CustomResourceProviderBase, Duration, Fn, RemovalPolicy, Stack
+from aws_cdk import (
+    Acknowledgment,
+    Annotations,
+    Aspects,
+    CfnOutput,
+    CustomResourceProviderBase,
+    Duration,
+    Fn,
+    RemovalPolicy,
+    Stack,
+    Validations,
+)
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_kms as kms
 from aws_cdk import aws_lambda as _lambda
@@ -36,10 +60,10 @@ from aws_cdk import aws_wafv2 as wafv2
 from cdk_nag import (
     AwsSolutionsChecks,
     HIPAASecurityChecks,
-    NagSuppressions,
     NIST80053R5Checks,
     PCIDSS321Checks,
     ServerlessChecks,
+    WriteNagSuppressionsToCloudFormationAspect,
 )
 from constructs import Construct, IConstruct
 
@@ -54,16 +78,92 @@ AWS_CUSTOM_RESOURCE_PROVIDER_ID = "AWS679f53fac002430cb0da5b7982bd2287"
 BUCKET_DEPLOYMENT_PROVIDER_ID = "Custom::CDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C"
 
 
+def attach_nag_packs(scope: IConstruct) -> None:
+    """Register the five cdk-nag v3 rule packs as policy-validation plugins.
+
+    Call once on the App root (``app.py`` does; the nag-gating test fixtures
+    do the same on their test Apps). cdk-nag v3 packs participate in CDK's
+    policy validation framework: they evaluate the *synthesized assembly*
+    during ``app.synth()`` and fail the synthesis on unacknowledged findings —
+    they are no longer ``IAspect``s added per stack.
+
+    The v2-compatible ``cdk_nag`` Metadata audit trail is NOT enabled here:
+    the packs' ``write_suppressions_to_cloud_formation`` flag registers its
+    aspect at this (App) scope, and CDK aspects do not cross ``cdk.Stage``
+    boundaries — Stage-nested stacks would silently lose the metadata
+    (verified empirically against 3.0.1). ``apply_compliance_aspects``
+    registers ``WriteNagSuppressionsToCloudFormationAspect`` per stack
+    instead, which reaches every stack regardless of nesting.
+    """
+    Validations.of(scope).add_plugins(
+        AwsSolutionsChecks(scope, verbose=True),
+        ServerlessChecks(scope, verbose=True),
+        NIST80053R5Checks(scope, verbose=True),
+        HIPAASecurityChecks(scope, verbose=True),
+        PCIDSS321Checks(scope, verbose=True),
+    )
+
+
 def apply_compliance_aspects(stack: Stack) -> None:
-    """Attach every cdk-nag rule pack plus this project's validation Aspect to ``stack``."""
-    Aspects.of(stack).add(AwsSolutionsChecks(verbose=True))
-    Aspects.of(stack).add(ServerlessChecks(verbose=True))
-    Aspects.of(stack).add(NIST80053R5Checks(verbose=True))
-    Aspects.of(stack).add(HIPAASecurityChecks(verbose=True))
-    Aspects.of(stack).add(PCIDSS321Checks(verbose=True))
-    # Project-specific invariants no rule pack covers: log-group retention and
-    # explicit removal policies on stateful resources.
+    """Attach this project's validation Aspect to ``stack``.
+
+    Carries ``TemplateConventionChecks`` plus cdk-nag's
+    ``WriteNagSuppressionsToCloudFormationAspect`` since cdk-nag v3: the five
+    rule packs are policy-validation plugins registered once at the App root
+    via :func:`attach_nag_packs`, not per-stack Aspects. The project-specific
+    invariants (log-group retention, explicit removal policies on stateful
+    resources) remain a per-stack Aspect surfacing error annotations, and the
+    write-suppressions aspect keeps the v2-style ``cdk_nag`` Metadata audit
+    trail (acknowledged rules + reasons) in every synthesized template — it
+    must be per stack because aspects do not cross ``cdk.Stage`` boundaries.
+    """
     Aspects.of(stack).add(TemplateConventionChecks())
+    Aspects.of(stack).add(WriteNagSuppressionsToCloudFormationAspect())
+
+
+def acknowledge_rules(construct: IConstruct, suppressions: Iterable[Mapping[str, object]]) -> None:
+    """Acknowledge cdk-nag findings on ``construct`` (v3 ``Validations`` API).
+
+    The project-wide adapter from this repo's suppression data shape —
+    ``{"id": rule, "reason": why, "applies_to": [findings...]?}``, unchanged
+    from the v2 era — onto ``Validations.of().acknowledge()``:
+
+    - each ``applies_to`` entry expands to the granular ``Rule[Finding]`` id
+      v3 matches individually (e.g. ``AwsSolutions-IAM5[Resource::*]``);
+    - entries without ``applies_to`` acknowledge the bare rule id, which
+      matches rules that report a single, non-granular finding.
+
+    Acknowledgments cover the construct's whole subtree — v3 walks the
+    ancestor tree when checking a finding — so v2's ``apply_to_children``
+    distinction no longer exists.
+
+    **Metadata fallback for validator-rejected ids.** CDK's
+    ``Validations.acknowledge`` rejects any id containing more than one
+    ``::``, but cdk-nag 3.0.1's own IAM4 findings embed managed-policy ARNs
+    (``AwsSolutions-IAM4[Policy::arn:<AWS::Partition>:iam::aws:policy/…]``) —
+    the packs emit finding ids their acknowledge API refuses to accept. The
+    plugin's matching reads the ``aws:cdk:acknowledged-rules`` construct
+    metadata that ``acknowledge()`` writes, WITHOUT re-validating (verified
+    empirically against 3.0.1), so ids the front door rejects are written to
+    that metadata key directly. Drop the fallback once cdk-nag/CDK reconcile
+    the id grammar upstream.
+    """
+    front_door: list[Acknowledgment] = []
+    fallback: dict[str, str] = {}
+    for suppression in suppressions:
+        rule_id = cast(str, suppression["id"])
+        reason = cast(str, suppression["reason"])
+        applies_to = cast("list[str] | None", suppression.get("applies_to"))
+        finding_ids = [f"{rule_id}[{finding}]" for finding in applies_to] if applies_to else [rule_id]
+        for finding_id in finding_ids:
+            if finding_id.count("::") > 1:
+                fallback[finding_id] = reason
+            else:
+                front_door.append(Acknowledgment(id=finding_id, reason=reason))
+    if front_door:
+        Validations.of(construct).acknowledge(*front_door)
+    if fallback:
+        construct.node.add_metadata("aws:cdk:acknowledged-rules", fallback)
 
 
 def grant_logs_service_to_key(key: kms.Key, *, region: str, account: str, partition: str) -> None:
@@ -281,7 +381,7 @@ def attach_async_failure_destination(
     dlq_terminal_reason = (
         "Terminal DLQ: this queue IS the dead-letter destination — recursing into another DLQ has no recovery value"
     )
-    NagSuppressions.add_resource_suppressions(
+    acknowledge_rules(
         dlq,
         [
             {"id": "AwsSolutions-SQS3", "reason": dlq_terminal_reason},
@@ -302,7 +402,7 @@ def attach_async_failure_destination(
     kms_wildcard_reason = (
         "KMS wildcards required by configure_async_invoke to encrypt messages to the CMK-encrypted DLQ"
     )
-    NagSuppressions.add_resource_suppressions(
+    acknowledge_rules(
         cast(Construct, singleton),
         [
             {
@@ -320,7 +420,6 @@ def attach_async_failure_destination(
             },
             {"id": "PCI.DSS.321-IAMNoInlinePolicy", "reason": "CDK-generated inline policy on singleton service role"},
         ],
-        apply_to_children=True,
     )
 
     # Surface the DLQ URL so operators can find captured provider failures. Emitted
@@ -347,10 +446,9 @@ def suppress_cdk_singletons(scope: IConstruct, singleton_ids: Iterable[str]) -> 
     for singleton_id in singleton_ids:
         singleton = scope.node.try_find_child(singleton_id)
         if singleton is not None:
-            NagSuppressions.add_resource_suppressions(
+            acknowledge_rules(
                 cast(Construct, singleton),
                 CDK_LAMBDA_SUPPRESSIONS,
-                apply_to_children=True,
             )
 
 
@@ -402,7 +500,7 @@ def create_auto_delete_objects_log_group(scope: Stack, encryption_key: kms.Key) 
                     auto_delete_cr.node.add_dependency(log_group)
         # The provider is a CDK-managed singleton Lambda; suppress its standard
         # singleton nag findings here so callers don't each repeat the block.
-        NagSuppressions.add_resource_suppressions(provider, CDK_LAMBDA_SUPPRESSIONS, apply_to_children=True)
+        acknowledge_rules(provider, CDK_LAMBDA_SUPPRESSIONS)
     return provider
 
 
@@ -481,7 +579,7 @@ def create_sse_s3_log_bucket(
         removal_policy=removal_policy,
         auto_delete_objects=auto_delete,
     )
-    NagSuppressions.add_resource_suppressions(
+    acknowledge_rules(
         bucket,
         [{"id": rule, "reason": suppression_reason} for rule in _LOG_SINK_SUPPRESSION_RULES],
     )
@@ -596,9 +694,20 @@ def create_waf_logs_bucket(scope: Construct, suffix: str) -> s3.Bucket:
     return bucket
 
 
-CDK_LAMBDA_SUPPRESSIONS = [
-    {"id": "AwsSolutions-IAM4", "reason": "CDK-managed singleton Lambda uses AWS managed execution role"},
-    {"id": "AwsSolutions-IAM5", "reason": "CDK-managed singleton Lambda uses wildcard in auto-generated policy"},
+CDK_LAMBDA_SUPPRESSIONS: list[dict[str, object]] = [
+    # cdk-nag v3 matches granular IAM4/IAM5 findings individually, so the
+    # v2-era blanket entries are enumerated: every CDK-managed singleton runs
+    # on AWSLambdaBasicExecutionRole (the Policy:: finding id routes through
+    # acknowledge_rules' metadata fallback — it contains multiple '::').
+    # Singleton-specific IAM5 wildcard findings (e.g. the BucketDeployment
+    # handler's s3 grants) are acknowledged at their call sites, where the
+    # region- and construct-specific finding ids can be built — a blanket
+    # AwsSolutions-IAM5 here would match nothing in v3.
+    {
+        "id": "AwsSolutions-IAM4",
+        "reason": "CDK-managed singleton Lambda uses AWS managed execution role",
+        "applies_to": ["Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"],
+    },
     {"id": "AwsSolutions-L1", "reason": "CDK-managed singleton Lambda runtime is not configurable"},
     {"id": "Serverless-LambdaTracing", "reason": "CDK-managed singleton Lambda — tracing is not configurable"},
     {"id": "Serverless-LambdaDLQ", "reason": "CDK-managed singleton Lambda — DLQ is not configurable"},

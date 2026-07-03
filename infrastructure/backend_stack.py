@@ -3,12 +3,12 @@ from typing import Any, cast
 from aws_cdk import CfnOutput, Stack
 from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_iam as iam
-from cdk_nag import NagSuppressions
 from constructs import Construct
 
 from infrastructure.backend_app import BackendApp
 from infrastructure.nag_utils import (
     AWS_CUSTOM_RESOURCE_PROVIDER_ID,
+    acknowledge_rules,
     apply_compliance_aspects,
     attach_async_failure_destination,
     suppress_cdk_singletons,
@@ -154,7 +154,7 @@ class BackendStack(Stack):
         )
 
         # ── Stack-level cdk-nag suppressions (genuinely stack-wide) ─────────────
-        NagSuppressions.add_stack_suppressions(
+        acknowledge_rules(
             self,
             [
                 # ── AWS Solutions ────────────────────────────────────────────────

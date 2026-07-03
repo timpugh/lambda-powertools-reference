@@ -34,6 +34,7 @@ import aws_cdk as cdk
 from aws_cdk.assertions import Template
 
 from infrastructure.app_stage import AppStage
+from infrastructure.nag_utils import attach_nag_packs
 
 # Skip Docker bundling so these tests run without Docker (same key the CLI honours).
 _NO_BUNDLING = {"aws:cdk:bundling-stacks": []}
@@ -66,8 +67,13 @@ def _normalize(template: dict) -> str:
 
 @pytest.fixture(scope="module")
 def prod_stage() -> AppStage:
-    """Synthesize the default (prod) stage for us-east-1."""
+    """Synthesize the default (prod) stage for us-east-1.
+
+    Packs attached as in app.py: cdk-nag v3's write-suppressions aspect is
+    what keeps the cdk_nag Metadata audit trail in the snapshotted templates.
+    """
     app = cdk.App(context=_NO_BUNDLING)
+    attach_nag_packs(app)
     return AppStage(app, "ServerlessApp-us-east-1-stage", region="us-east-1")
 
 
