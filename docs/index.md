@@ -15,7 +15,7 @@ from the Google-style docstrings in the source via
 
 - [Lambda handler](lambda_handler.md) — the Powertools route handler, Pydantic models, and cross-cutting concerns.
 - [Backend application construct](backend_app.md) — `BackendApp`: the domain construct that owns every backend resource.
-- [Backend stack](cdk_stack.md) — thin wrapper composing `BackendApp` and attaching stack-level cdk-nag suppressions.
+- [Backend stack](backend_stack.md) — thin wrapper composing `BackendApp` and attaching stack-level cdk-nag suppressions.
 - [WAF stack](waf_stack.md) — us-east-1 WebACL attached to CloudFront.
 - [Frontend stack](frontend_stack.md) — CloudFront, S3 access logs, Glue + Athena analytics.
 - [NAG utilities](nag_utils.md) — cdk-nag suppression helpers shared across stacks.

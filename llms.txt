@@ -1,8 +1,8 @@
 # Lambda Powertools Reference
 
 > Production-grade AWS CDK reference architecture for Lambda + Powertools
-> serverless applications: three-stack CDK composition (WAF / backend /
-> frontend) behind a cdk.Stage, five-rule-pack cdk-nag gating on every synth,
+> serverless applications: five-stack CDK composition (data / WAF / backend /
+> frontend / audit) behind a cdk.Stage, five-rule-pack cdk-nag gating on every synth,
 > end-to-end customer-managed-key encryption, WAF + CloudFront, CloudTrail
 > object-level data events, browser RUM with X-Ray correlation, Athena
 > access-log analytics, and supply-chain hygiene (pinned everything, grouped
@@ -39,7 +39,7 @@ Key facts for agents working in this repo:
   application construct (KMS, DynamoDB, SSM, AppConfig, Lambda, API Gateway,
   regional WAF, monitoring + alarms)
 - [infrastructure/app_stage.py](infrastructure/app_stage.py): the
-  Stage grouping all three stacks; environment naming lives here
+  Stage grouping all five stacks; environment naming lives here
 - [infrastructure/nag_utils.py](infrastructure/nag_utils.py): shared cdk-nag aspects
   and confused-deputy-guarded KMS service grants
 - [tests/](tests/): unit (100% coverage gate), CDK assertions + in-process
