@@ -31,7 +31,7 @@ Issues = "https://github.com/timpugh/lambda-powertools-reference/issues"
 lambda = [
     "aws-lambda-powertools[all]==3.29.0",
     "aws-xray-sdk==2.15.0",
-    "boto3==1.43.40",
+    "boto3==1.43.41",
 ]
 
 # CDK infrastructure — used by `app.py`, `infrastructure/`, and the CDK stack
@@ -75,14 +75,14 @@ lint = [
     "bandit==1.9.4",
     "pip-audit==2.10.1",
     "pre-commit==4.6.0",
-    "boto3-stubs==1.43.39",
+    "boto3-stubs==1.43.41",
     "pydantic==2.13.4",
 ]
 
 # Documentation build — used only by `make docs`. The Zensical static site
 # generator is pre-1.0, so versions are pinned exactly.
 docs = [
-    "zensical==0.0.46",
+    "zensical==0.0.47",
     "mkdocstrings==1.0.4",
     "mkdocstrings-python==2.0.5",
 ]
