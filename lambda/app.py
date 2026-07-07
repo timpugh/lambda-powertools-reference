@@ -82,18 +82,20 @@ metrics = Metrics()
 # retry ever fired. Bounding the attempt turns a hang into a fast, retryable
 # error; 0.5s/1s is generous for the small same-region SSM/AppConfig/DynamoDB
 # calls this handler makes.
-# Budget math (keep it under the function timeout when tuning): the FULL retry
-# budget for one hung dependency is total attempts x (connect + read) plus
-# exponential-backoff sleeps between attempts — here 3 x 1.5s = 4.5s plus
-# ≤ ~3s of jittered sleeps ≈ 7.5s worst case, inside the function's 10s
-# timeout with headroom for the up-to-three sequential AWS calls a cold
-# request makes. (The previous config — max_attempts=4, i.e. 5 total attempts
-# x 3s = 15s — exceeded the timeout on its own: a browned-out dependency
-# became an API Gateway 502 — off the OpenAPI contract, no CORS header —
-# instead of the designed fast 500, and fed the canary rollback alarm during
-# deploys.)
+# Budget math (keep it under the function timeout when tuning). The @idempotent
+# layer makes TWO sequential DynamoDB writes per request — save_inprogress
+# (conditional PutItem) before the handler body, save_success (UpdateItem)
+# after — so a DynamoDB brownout hits this retry budget TWICE, not once. Size it
+# per call so even two serial browned-out DynamoDB calls stay under the 10s
+# function timeout: total_max_attempts=2 bounds ONE call at 2 x (0.5 + 1)
+# attempt-timeouts + ~1s of backoff ≈ 4s, so the two writes together reach ~8s
+# < 10s, with headroom for the SSM/AppConfig reads in between. (History:
+# total_max_attempts=3 put one call at ~7.5s, so the two writes reached ~15s and
+# timed out on a DynamoDB brownout — an API Gateway 502, off the OpenAPI
+# contract with no CORS header, feeding the canary rollback alarm during
+# deploys; the earlier max_attempts=4 was worse still.)
 boto_config = Config(
-    retries={"mode": "adaptive", "total_max_attempts": 3},
+    retries={"mode": "adaptive", "total_max_attempts": 2},
     connect_timeout=0.5,
     read_timeout=1,
 )

@@ -468,12 +468,14 @@ def test_sdk_socket_timeouts_bounded(lambda_app_module):
     retry policy ever fires. Explicit per-attempt bounds convert a hang into a
     fast, retryable error. The values are pinned (not just asserted non-default)
     because the FULL retry budget — total attempts x (connect + read) + backoff
-    sleeps — must stay under the function's 10s timeout; see the budget math on
-    boto_config in lambda/app.py. Asserting on the live clients (not just the
-    config object) catches a refactor that drops boto_config= from a constructor.
+    sleeps — must stay under the function's 10s timeout even though @idempotent
+    makes two serial DynamoDB writes per request (so a DynamoDB brownout hits the
+    budget twice); see the budget math on boto_config in lambda/app.py. Asserting
+    on the live clients (not just the config object) catches a refactor that
+    drops boto_config= from a constructor.
     """
     # botocore normalizes max_attempts to total_max_attempts inside Config.
-    assert lambda_app_module.boto_config.retries["total_max_attempts"] == 3
+    assert lambda_app_module.boto_config.retries["total_max_attempts"] == 2
     assert lambda_app_module.boto_config.connect_timeout == 0.5
     assert lambda_app_module.boto_config.read_timeout == 1
     assert lambda_app_module.ssm_provider.client.meta.config.connect_timeout == 0.5

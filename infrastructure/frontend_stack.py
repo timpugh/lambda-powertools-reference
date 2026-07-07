@@ -396,6 +396,14 @@ class FrontendStack(Stack):
             app_monitor_configuration=rum.CfnAppMonitor.AppMonitorConfigurationProperty(
                 allow_cookies=True,
                 enable_x_ray=True,
+                # session_sample_rate is a CLIENT-SIDE knob: the RUM browser
+                # client reads it to decide what fraction of sessions to record.
+                # It does NOT bound the data plane — the public unauthenticated
+                # identity pool above lets anyone mint guest credentials and call
+                # rum:PutRumEvents directly, ignoring this rate entirely. So
+                # lowering it is a legitimate-traffic COST lever only; the
+                # adversarial-ingestion vector needs a Budgets / RUM-volume alarm,
+                # not a smaller sample rate (see TODO.md "CloudWatch RUM").
                 session_sample_rate=1.0,
                 # CloudFormation's schema only accepts ["errors", "performance", "http"] here —
                 # "interaction" is rejected as an invalid enum value despite being a real RUM
