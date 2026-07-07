@@ -40,6 +40,12 @@ jobs:
         with:
           results_file: results.sarif
           results_format: sarif
+          # Fine-grained PAT (repo-scoped, Administration: Read-only) lets the
+          # Branch-Protection check read classic protection rules the default
+          # GITHUB_TOKEN can't see. The `|| github.token` fallback keeps the scan
+          # working where the secret is absent (forks / template copies) — only
+          # Branch-Protection degrades there. See README "Code scoring and attestation".
+          repo_token: ${{ secrets.SCORECARD_TOKEN || github.token }}
           # Public repo: publish to the OpenSSF API so the score is queryable
           # (and a badge can be added to the README if wanted).
           publish_results: true
