@@ -10,9 +10,9 @@ aws-encryption-sdk==4.0.6 \
     --hash=sha256:35f62f775a8d4a6cb677a4a8927bb19acb3da35308405213f668396ee6298ad4 \
     --hash=sha256:ec03bfa2df64ef21417bd6ff749bb63e84149586a4f7fbe528ec6b443326ea9e
     # via aws-lambda-powertools
-aws-lambda-powertools==3.29.0 \
-    --hash=sha256:a81ce122356343878e095a11bd38f3e9a70f3fa0fea57b10b327d1e8dfe82b6e \
-    --hash=sha256:e9ca87b5a8a835a7f7e327d5bafa43b6e0c150c6cb8c6b42158b0814377edc7a
+aws-lambda-powertools==3.31.0 \
+    --hash=sha256:65f81f1c81e536fb04c20885b7bcd468d5cd232b813c11b6a1634b7d03bd3c8c \
+    --hash=sha256:fb6e7753ba1657490c8ed43bac9f44bef4c08bdcde2ddf9af2b35d31b061c5f6
 aws-xray-sdk==2.15.0 \
     --hash=sha256:422d62ad7d52e373eebb90b642eb1bb24657afe03b22a8df4a8b2e5108e278a3 \
     --hash=sha256:794381b96e835314345068ae1dd3b9120bd8b4e21295066c37e8814dbb341365
