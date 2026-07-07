@@ -8,6 +8,10 @@ name: OpenSSF Scorecard
 # settings change quietly weakened the posture.
 
 on:
+  # Manual trigger — re-run on demand (e.g. to refresh the published score after
+  # a posture change, or once the repo ages past a time-based check such as
+  # "Maintained", which zeroes out for repos younger than 90 days).
+  workflow_dispatch:
   branch_protection_rule:
   push:
     branches: [main]
