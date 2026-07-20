@@ -69,8 +69,8 @@ test = [
 lint = [
     "radon==6.0.1",
     "xenon==0.9.3",
-    "mypy==2.1.0",
-    "ruff==0.15.20",
+    "mypy==2.3.0",
+    "ruff==0.15.22",
     "pylint==4.0.6",
     "bandit==1.9.4",
     "pip-audit==2.10.1",
