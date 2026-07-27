@@ -29,9 +29,9 @@ Issues = "https://github.com/timpugh/lambda-powertools-reference/issues"
 # Lambda runtime — ships in the deployment bundle AND is installed locally
 # for unit tests that import `lambda/app.py`.
 lambda = [
-    "aws-lambda-powertools[all]==3.31.0",
+    "aws-lambda-powertools[all]==3.31.1",
     "aws-xray-sdk==2.15.0",
-    "boto3==1.43.41",
+    "boto3==1.43.56",
 ]
 
 # CDK infrastructure — used by `app.py`, `infrastructure/`, and the CDK stack
@@ -74,16 +74,16 @@ lint = [
     "pylint==4.0.6",
     "bandit==1.9.4",
     "pip-audit==2.10.1",
-    "pre-commit==4.6.0",
-    "boto3-stubs==1.43.41",
+    "pre-commit==4.6.1",
+    "boto3-stubs==1.43.56",
     "pydantic==2.13.4",
 ]
 
 # Documentation build — used only by `make docs`. The Zensical static site
 # generator is pre-1.0, so versions are pinned exactly.
 docs = [
-    "zensical==0.0.47",
-    "mkdocstrings==1.0.4",
+    "zensical==0.0.51",
+    "mkdocstrings==1.0.6",
     "mkdocstrings-python==2.0.5",
 ]
 
