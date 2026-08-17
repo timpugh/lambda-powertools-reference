@@ -31,7 +31,7 @@ Issues = "https://github.com/timpugh/lambda-powertools-reference/issues"
 lambda = [
     "aws-lambda-powertools[all]==3.31.0",
     "aws-xray-sdk==2.15.0",
-    "boto3==1.43.41",
+    "boto3==1.43.71",
 ]
 
 # CDK infrastructure — used by `app.py`, `infrastructure/`, and the CDK stack
@@ -42,7 +42,7 @@ cdk = [
     "constructs==10.6.0",
     "aws-cdk-aws-lambda-python-alpha==2.261.0a0",
     "cdk-monitoring-constructs==10.1.0",
-    "cdk-nag==3.0.1",
+    "cdk-nag==3.0.2",
 ]
 
 # Test runner — environment-agnostic; pairs with either `lambda` (unit tests,
@@ -71,19 +71,19 @@ lint = [
     "xenon==0.9.3",
     "mypy==2.1.0",
     "ruff==0.15.20",
-    "pylint==4.0.6",
+    "pylint==4.0.7",
     "bandit==1.9.4",
     "pip-audit==2.10.1",
-    "pre-commit==4.6.0",
-    "boto3-stubs==1.43.41",
+    "pre-commit==4.6.2",
+    "boto3-stubs==1.43.71",
     "pydantic==2.13.4",
 ]
 
 # Documentation build — used only by `make docs`. The Zensical static site
 # generator is pre-1.0, so versions are pinned exactly.
 docs = [
-    "zensical==0.0.47",
-    "mkdocstrings==1.0.4",
+    "zensical==0.0.54",
+    "mkdocstrings==1.0.6",
     "mkdocstrings-python==2.0.5",
 ]
 
